@@ -1176,7 +1176,9 @@ local function rarityFromColor(color)
         return "basic"
     end
 
-    -- Серебристый — только если это правда серый, а не белый по умолчанию
+    -- Серебристый Rare: оттенок серого + Glass проверяются на уровне объекта.
+    -- Здесь цвет остаётся запасным признаком для частей модели, но не для одиночного
+    -- корня — detectRarity требует сигнатуру материала или несколько частей.
     if isGrey and s < 0.18 and v >= 0.55 and v <= 0.92 then
         return "rare"
     end
@@ -1291,11 +1293,14 @@ local function detectRarity(sprout)
             end
         end
 
-        -- Rare: подтверждённый серебристый Glass с Sparkles Rate около 50.
+        -- Rare: серебристый/серый Glass. Rate у ParticleEmitter может меняться
+        -- или отсутствовать в разных клиентах, поэтому не делаем его обязательным.
+        -- Rate используется только как дополнительная проверка, если он есть.
         if isGrey and sat < 0.18 and val >= 0.55 and val <= 0.92
-            and rootPart.Material == Enum.Material.Glass and rate
-            and rate >= 35 and rate <= 60 then
-            return "rare", "signature:rare-silver-glass"
+            and rootPart.Material == Enum.Material.Glass then
+            if rate == nil or (rate >= 20 and rate <= 80) then
+                return "rare", "signature:rare-silver-glass"
+            end
         end
     end
 
