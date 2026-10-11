@@ -364,24 +364,25 @@ isSprout = function(obj)
     -- эффекты/остатки: кандидат должен называться ровно Sprout.
     if low ~= "sprout" then return false end
 
-    -- Не фильтруем по Transparency/Size: Roblox может временно менять их
-    -- при появлении/сборе, из-за чего настоящий Common пропускался.
-    -- Деталь с именем Sprout — кандидат; Model проверяем по имени и наличию частей.
-    if isPart then return true end
-    if isModel then
-        local okParts, descendants = pcall(function() return obj:GetDescendants() end)
-        if not okParts then return true end
-        for _, d in ipairs(descendants) do
-            if d:IsA("BasePart") then return true end
-        end
-        return false
+    -- Отсекаем зависшие/пустые остатки с именем Sprout:
+    -- у настоящего кандидата должна быть хотя бы одна геометрически ненулевая,
+    -- видимая деталь. Проверяем весь Model/Folder, а не только корень.
+    local function hasVisiblePart(part)
+        if not part or not part:IsA("BasePart") then return false end
+        local okPart, visible = pcall(function()
+            return part.Transparency < 1
+                and part.Size.X > 0.05 and part.Size.Y > 0.05 and part.Size.Z > 0.05
+                and part:IsDescendantOf(Workspace)
+        end)
+        return okPart and visible == true
     end
-    -- Folder с именем Sprout тоже может быть контейнером модели в некоторых версиях.
-    if isFolder then
+
+    if isPart then return hasVisiblePart(obj) end
+    if isModel or isFolder then
         local okParts, descendants = pcall(function() return obj:GetDescendants() end)
         if not okParts then return false end
         for _, d in ipairs(descendants) do
-            if d:IsA("BasePart") then return true end
+            if hasVisiblePart(d) then return true end
         end
     end
     return false
@@ -1823,7 +1824,13 @@ function Searcher:Start()
                                     "Одновременно найден росток: %s (%s) | Поле: %s",
                                     tostring(rarity), tostring(source), tostring(fieldName or "unknown")))
                             end
-                            local sproutReportOk = rarity and self:report(game.JobId, rarity, fieldName) or false
+                            -- Не теряем росток на сервере с Vicious, если тип не удалось
+                            -- определить: отправляем как Common так же, как в обычной ветке.
+                            local reportRarity = rarity or "common"
+                            if not rarity then
+                                log("Ищущий", "Тип ростка рядом с Vicious не подтверждён; отправляю как Common Sprout")
+                            end
+                            local sproutReportOk = self:report(game.JobId, reportRarity, fieldName)
                             if sproutReportOk then
                                 s.lastSprout = {
                                     fieldName = (RARITY_LABEL[rarity] or rarity) ..
