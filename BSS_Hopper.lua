@@ -554,13 +554,22 @@ end
 
 local function isPuffshroomRoot(obj)
     local name = string.lower(tostring(obj and obj.Name or ""))
+    -- Обычный Puffshroom в игре может называться просто "Sprout".
+    -- Не используем частичное совпадение "sprout", чтобы не ловить частицы/эффекты.
     return string.find(name, "puffshroom", 1, true) ~= nil
         or string.find(name, "puff shroom", 1, true) ~= nil
+        or name == "sprout"
 end
 
 local function parsePuffshroom(root)
     local text = string.lower(puffTextOf(root))
-    if not string.find(text, "puff", 1, true) then return nil end
+    local rootName = string.lower(tostring(root and root.Name or ""))
+    if not string.find(text, "puff", 1, true)
+        and not string.find(rootName, "puffshroom", 1, true)
+        and not string.find(rootName, "puff shroom", 1, true)
+        and rootName ~= "sprout" then
+        return nil
+    end
     local rarity
     -- Mythic first so text with multiple labels resolves to the highest rarity.
     for _, r in ipairs({"mythic", "legendary", "epic", "rare", "common"}) do
