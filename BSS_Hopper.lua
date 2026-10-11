@@ -662,9 +662,14 @@ local function findPuffshrooms()
         end
         if not nested and not seen[root] then
             local rarity, level = parsePuffshroom(root)
-            if rarity and level then
+            -- Таймер подтверждает, что это активный Puffshroom, а не оставшийся
+            -- объект/эффект с похожим именем. Без таймера не репортим и не лутаем.
+            local timer = findPuffshroomTimer(root)
+            if rarity and level and timer then
                 seen[root] = true
-                table.insert(results, { root = root, rarity = rarity, level = level })
+                table.insert(results, { root = root, rarity = rarity, level = level, timer = timer })
+            elseif rarity and level then
+                log("Puffshroom", "Пропущен кандидат без таймера: " .. tostring(root:GetFullName()))
             end
         end
     end
@@ -1743,7 +1748,11 @@ function Searcher:Start()
                             local puffField = detectField(puff)
                             log("Puffshroom", "Найден " .. puffRarity .. " level " .. tostring(puffLevel) .. " | поле=" .. tostring(puffField))
                             local puffTimer = findPuffshroomTimer(puff)
-                            self:reportPuffshroom(game.JobId, puffRarity, puffLevel, puffField, puffTimer)
+                            if puffTimer then
+                                self:reportPuffshroom(game.JobId, puffRarity, puffLevel, puffField, puffTimer)
+                            else
+                                log("Puffshroom", "Репорт отменён: у кандидата нет таймера")
+                            end
                         end
                     elseif puff and puffRarity then
                         log("Puffshroom", "Пропущен " .. puffRarity .. ": ниже выбранного порога " .. tostring(CONFIG.PUFF_MIN_RARITY))
