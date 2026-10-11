@@ -1279,13 +1279,15 @@ local function detectRarity(sprout)
             end
         end
 
-        -- Supreme и Common могут иметь похожий зелёный оттенок:
-        -- свечение — решающий признак, как ты описал.
+        -- Supreme и Common могут иметь похожий зелёный оттенок.
+        -- У подтверждённого Common из дампа: бледно-зелёный Plastic + Sparkles Rate=30.
+        -- У Supreme: зелёный росток со свечением. Сначала проверяем свечение.
         if deg > 62 and deg < 150 then
             if sproutHasGlow(sprout) then
                 return "supreme", "signature:supreme-glowing-green"
-            elseif rootPart.Material == Enum.Material.Plastic then
-                return "basic", "signature:common-green-plastic"
+            elseif rootPart.Material == Enum.Material.Plastic and rate
+                and rate >= 20 and rate <= 40 and sat < 0.45 then
+                return "basic", "signature:common-pale-green-plastic-low-sparkles"
             end
         end
 
@@ -1657,9 +1659,12 @@ function Searcher:Start()
                             s.currentStatus = "Репорт не дошёл, хопаю"
                         end
                     else
-                        -- Never send an unconfirmed type: the API intentionally rejects unknown.
-                        s.currentStatus = "Росток найден, тип не подтверждён — без репорта"
-                        log("Ищущий", "Тип ростка не подтверждён; не отправляю ложную редкость")
+                        -- Сохраняем диагностику в обычном логе, чтобы было понятно,
+                        -- почему росток не попал в Discord и что нужно прислать для фикса.
+                        s.currentStatus = "Росток найден, редкость не подтверждена"
+                        log("Ищущий", "Росток найден, но редкость не подтверждена; репорт не отправлен | source=" ..
+                            tostring(source) .. " | object=" .. tostring(sprout:GetFullName()) ..
+                            " | добавь DEBUG_SPROUT=true и пришли дамп")
                     end
 
                     task.wait(tonumber(CONFIG.REPORT_DELAY) or 2.5)
