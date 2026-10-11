@@ -1170,9 +1170,9 @@ local function rarityFromColor(color)
         return nil
     end
 
-    -- Зелёный: обычный тусклый = common, яркий светящийся = supreme
+    -- Зелёный цвет сам по себе не доказывает Supreme: свечение проверяется
+    -- отдельно на корневом объекте в detectRarity. По одному цвету — Common.
     if deg > 62 and deg < 150 and s > 0.25 then
-        if v >= 0.70 and s >= 0.85 then return "supreme" end
         return "basic"
     end
 
@@ -1279,10 +1279,14 @@ local function detectRarity(sprout)
             end
         end
 
-        -- Supreme: насыщенный зелёный с эффектом свечения; обычный Common
-        -- из дампа был бледно-зелёным Plastic без свечения.
-        if deg > 62 and deg < 150 and sat >= 0.65 and sproutHasGlow(sprout) then
-            return "supreme", "signature:supreme-glowing-green"
+        -- Supreme и Common могут иметь похожий зелёный оттенок:
+        -- свечение — решающий признак, как ты описал.
+        if deg > 62 and deg < 150 then
+            if sproutHasGlow(sprout) then
+                return "supreme", "signature:supreme-glowing-green"
+            elseif rootPart.Material == Enum.Material.Plastic then
+                return "basic", "signature:common-green-plastic"
+            end
         end
 
         -- Rare: подтверждённый серебристый Glass с Sparkles Rate около 50.
