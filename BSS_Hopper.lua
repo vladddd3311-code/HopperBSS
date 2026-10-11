@@ -2935,11 +2935,11 @@ local MODE_META = {
     },
 }
 
-local secModes = section("РЕЖИМ РАБОТЫ", 1)
+local secModes = section("РЕЖИМ РАБОТЫ", 10)
 
 local modeRow = new("Frame", {
     Size = UDim2.new(1, 0, 0, 120), BackgroundTransparency = 1,
-    LayoutOrder = 2, Parent = content,
+    LayoutOrder = 11, Parent = content,
 })
 new("UIListLayout", {
     FillDirection = Enum.FillDirection.Horizontal,
@@ -3249,7 +3249,7 @@ local fConn  = makeField(pageSettings, "ТАЙМАУТ ПОДКЛЮЧЕНИЯ (�
 local fPlace = makeField(pageSettings, "PLACE ID", CONFIG.PLACE_ID,
     "1537690962", 25)
 
-section("МИНИМАЛЬНАЯ РЕДКОСТЬ СПРУТА", 30).Parent = pageSettings
+local sproutRaritySection = section("МИНИМАЛЬНАЯ РЕДКОСТЬ", 1)
 
 local sproutRarityOrder = { "basic", "moon", "rare", "gummy", "epic", "legendary" }
 local sproutRarityLabels = {
@@ -3268,7 +3268,7 @@ if not RARITY_PRIORITY[CONFIG.MIN_RARITY] then CONFIG.MIN_RARITY = "basic" end
 
 local sproutRarityRow = new("Frame", {
     Size = UDim2.new(1, 0, 0, 70), BackgroundTransparency = 1,
-    LayoutOrder = 31, Parent = pageSettings,
+    LayoutOrder = 2, Parent = nil,
 })
 new("UIGridLayout", {
     CellSize = UDim2.new(0.25, -5, 0, 30),
@@ -3319,7 +3319,7 @@ local sproutRarityHelp = new("TextLabel", {
     Text = "Минимальная редкость",
     TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 10,
     TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
-    LayoutOrder = 32, Parent = pageSettings,
+    LayoutOrder = 3, Parent = nil,
 })
 
 section("ОПЦИИ", 40).Parent = pageSettings
@@ -3672,19 +3672,25 @@ new("UIListLayout", {
     Parent = PAGE_MAIN,
 })
 
--- Блоки поиска должны находиться именно во вкладке «Спруты».
+-- Main содержит выбор режима: Ищущий, Лутающий и Соло.
 for _, obj in ipairs({
     secModes, modeRow, secStatus, statusBox, secLast, lastBox,
 }) do
-    if obj then obj.Parent = PAGE_MAIN end
+    if obj then obj.Parent = PAGE_HOME end
 end
--- Порядок на Main: целевые переключатели, режимы, статус, последняя задача.
 secModes.LayoutOrder = 10
 modeRow.LayoutOrder = 11
 secStatus.LayoutOrder = 20
-statusBox.LayoutOrder = 21
-secLast.LayoutOrder = 30
-lastBox.LayoutOrder = 31
+statusBox.LayoutOrder = 30
+secLast.LayoutOrder = 40
+lastBox.LayoutOrder = 41
+
+-- Настройка минимальной редкости находится во вкладке «Спруты».
+sproutRaritySection.Parent = PAGE_MAIN
+sproutRaritySection.LayoutOrder = 1
+sproutRarityRow.Parent = PAGE_MAIN
+sproutRarityHelp.Parent = PAGE_MAIN
+sproutRarityHelp.LayoutOrder = 3
 -- Статистика удалена из интерфейса по просьбе пользователя.
 if secStats then secStats:Destroy() end
 if statRow then statRow:Destroy() end
