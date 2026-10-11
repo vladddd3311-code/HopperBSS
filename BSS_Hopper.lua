@@ -95,7 +95,7 @@ end
 local CONFIG = {
     MODE         = "searcher",
     API_URL      = "https://hopper-bss-production.up.railway.app",
-    API_KEY      = "fc2aa6619c2ddf188294559d9cac760fefb6c25e9ba32e2a0ac46ff5abc8d850",
+    API_KEY      = "REPLACE_WITH_YOUR_API_KEY",
     SELF_TAG     = "searcher1",
     VICIOUS_CHANNEL_ID = "", -- Discord channel ID for Vicious Bee reports (handled by backend)
     PUFFSHROOM_CHANNEL_ID = "1558633541577740318", -- Discord channel для редких Puffshroom
