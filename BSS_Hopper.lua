@@ -623,22 +623,44 @@ local function findPuffshroomTimer(root)
     return nil
 end
 
-local function findPuffshroom()
+local function findPuffshrooms()
     local ok, descendants = pcall(function() return Workspace:GetDescendants() end)
-    if not ok then return nil end
-    local candidates = {}
+    if not ok then return {} end
+    local candidates, results, seen = {}, {}, {}
     for _, obj in ipairs(descendants) do
         if isPuffshroomRoot(obj) then
-            -- Prefer Model roots; otherwise a named part may be the only replicated root.
             if obj:IsA("Model") then table.insert(candidates, 1, obj)
             else table.insert(candidates, obj) end
         end
     end
     for _, root in ipairs(candidates) do
-        local rarity, level = parsePuffshroom(root)
-        if rarity and level then return root, rarity, level end
+        local ancestor, nested = root.Parent, false
+        while ancestor and ancestor ~= Workspace do
+            if isPuffshroomRoot(ancestor) then nested = true; break end
+            ancestor = ancestor.Parent
+        end
+        if not nested and not seen[root] then
+            local rarity, level = parsePuffshroom(root)
+            if rarity and level then
+                seen[root] = true
+                table.insert(results, { root = root, rarity = rarity, level = level })
+            end
+        end
     end
-    return nil
+    return results
+end
+
+local function findEligiblePuffshrooms()
+    local results = {}
+    local minimumRarity = PUFF_RARITY_PRIORITY[CONFIG.PUFF_MIN_RARITY] or 1
+    for _, entry in ipairs(findPuffshrooms()) do
+        local levelKey = "PUFF_MIN_LEVEL_" .. string.upper(entry.rarity)
+        local minimumLevel = math.clamp(tonumber(CONFIG[levelKey]) or 0, 0, 30)
+        if (PUFF_RARITY_PRIORITY[entry.rarity] or 0) >= minimumRarity and entry.level >= minimumLevel then
+            table.insert(results, entry)
+        end
+    end
+    return results
 end
 
 -- ══════════════════════════════════════════════════════════════════════
