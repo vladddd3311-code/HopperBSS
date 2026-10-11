@@ -604,8 +604,12 @@ local function parsePuffshroom(root)
         rarity = "common"
         level = 1
     end
-    if not level or level < 1 or level > 30 then return nil end
-    -- Отсутствующая подпись редкости у точно распознанного Puffshroom = Common.
+    -- Если редкость/уровень не удалось подтвердить, считаем объект Common.
+    -- Неизвестный уровень задаём как 1, чтобы обычный росток не отбрасывался
+    -- только из-за отсутствующих метаданных.
+    if not level or level < 1 or level > 30 then
+        level = 1
+    end
     rarity = rarity or "common"
     return rarity, math.floor(level)
 end
