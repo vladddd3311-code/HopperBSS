@@ -100,7 +100,7 @@ local CONFIG = {
     VICIOUS_CHANNEL_ID = "", -- Discord channel ID for Vicious Bee reports (handled by backend)
     PUFFSHROOM_CHANNEL_ID = "1558633541577740318", -- Discord channel для редких Puffshroom
     CHECK_PUFFSHROOMS = true,
-    PUFF_MIN_RARITY = "rare", -- минимальная редкость Puffshroom для уведомлений/цели
+    PUFF_MIN_RARITY = "common", -- минимальная редкость Puffshroom для уведомлений/цели
     FIXED_LEVEL  = "basic",
     MIN_RARITY   = "basic",   -- лутающий берёт только не ниже этого
     PLACE_ID     = 1537690962,
@@ -528,7 +528,7 @@ end
 --  PUFFSHROOMS: только Rare / Epic / Legendary / Mythic
 --  Берём признаки из имени, атрибутов и видимых Billboard/SurfaceGui текстов.
 -- ══════════════════════════════════════════════════════════════════════
-local PUFF_RARITY_PRIORITY = { rare = 1, epic = 2, legendary = 3, mythic = 4 }
+local PUFF_RARITY_PRIORITY = { common = 1, rare = 2, epic = 3, legendary = 4, mythic = 5 }
 local puffReported = {}
 local function puffTextOf(root)
     local chunks = { tostring(root.Name or "") }
@@ -572,7 +572,7 @@ local function parsePuffshroom(root)
     if not string.find(text, "puff", 1, true) then return nil end
     local rarity
     -- Mythic first so text with multiple labels resolves to the highest rarity.
-    for _, r in ipairs({"mythic", "legendary", "epic", "rare"}) do
+    for _, r in ipairs({"mythic", "legendary", "epic", "rare", "common"}) do
         if string.find(text, r, 1, true) then rarity = r; break end
     end
     if not rarity then return nil end
@@ -3335,7 +3335,7 @@ for i = 1, 5 do
         section("ПОИСК PUFFSHROOMS", 1).Parent = p
         local puffInfo = new("TextLabel", {
             Size = UDim2.new(1, 0, 0, 68), BackgroundColor3 = C.card,
-            Text = "🍄 Автопоиск Puffshroom. В Discord отправляются только Rare, Epic, Legendary и Mythic; в уведомлении указан уровень гриба.",
+            Text = "🍄 Автопоиск Puffshroom. В Discord отправляются Common, Rare, Epic, Legendary и Mythic; в уведомлении указан уровень гриба.",
             TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 11,
             TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
             TextYAlignment = Enum.TextYAlignment.Center,
@@ -3354,9 +3354,10 @@ for i = 1, 5 do
         end)
 
         section("МИНИМАЛЬНАЯ РЕДКОСТЬ PUFFSHROOM", 4).Parent = p
-        local puffRarityOrder = { "rare", "epic", "legendary", "mythic" }
-        local puffRarityLabels = { rare = "Rare", epic = "Epic", legendary = "Legendary", mythic = "Mythic" }
+        local puffRarityOrder = { "common", "rare", "epic", "legendary", "mythic" }
+        local puffRarityLabels = { common = "Common", rare = "Rare", epic = "Epic", legendary = "Legendary", mythic = "Mythic" }
         local puffRarityColors = {
+            common = Color3.fromRGB(130, 220, 135),
             rare = Color3.fromRGB(90, 180, 255),
             epic = Color3.fromRGB(180, 115, 255),
             legendary = Color3.fromRGB(255, 190, 75),
@@ -3383,7 +3384,7 @@ for i = 1, 5 do
         end
         for index, rarityName in ipairs(puffRarityOrder) do
             local button = new("TextButton", {
-                Size = UDim2.new(0.25, -5, 1, 0),
+                Size = UDim2.new(0.2, -5, 1, 0),
                 BackgroundColor3 = C.field, Text = puffRarityLabels[rarityName],
                 TextColor3 = puffRarityColors[rarityName], Font = Enum.Font.GothamBold,
                 TextSize = 10, AutoButtonColor = false, BorderSizePixel = 0,
@@ -3399,12 +3400,12 @@ for i = 1, 5 do
             end)
         end
         if not PUFF_RARITY_PRIORITY[CONFIG.PUFF_MIN_RARITY] then
-            CONFIG.PUFF_MIN_RARITY = "rare"
+            CONFIG.PUFF_MIN_RARITY = "common"
         end
         paintPuffRarity()
         local puffRarityHelp = new("TextLabel", {
             Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1,
-            Text = "Учитывать только выбранную редкость и выше: например, Epic = Epic, Legendary и Mythic.",
+            Text = "Учитывать выбранную редкость и выше. Common включает все Puffshrooms.",
             TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 10,
             TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
             LayoutOrder = 6, Parent = p,
