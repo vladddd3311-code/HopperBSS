@@ -1281,26 +1281,24 @@ local function detectRarity(sprout)
             end
         end
 
-        -- Supreme и Common могут иметь похожий зелёный оттенок.
-        -- У подтверждённого Common из дампа: бледно-зелёный Plastic + Sparkles Rate=30.
-        -- У Supreme: зелёный росток со свечением. Сначала проверяем свечение.
+        -- Supreme и Common: сначала проверяем цвет + материал + эффект.
+        -- Rate не обязателен для Common: в некоторых клиентах ParticleEmitter
+        -- может отсутствовать или иметь другое значение.
         if deg > 62 and deg < 150 then
             if sproutHasGlow(sprout) then
                 return "supreme", "signature:supreme-glowing-green"
-            elseif rootPart.Material == Enum.Material.Plastic and rate
-                and rate >= 20 and rate <= 40 and sat < 0.45 then
-                return "basic", "signature:common-pale-green-plastic-low-sparkles"
+            elseif rootPart.Material == Enum.Material.Plastic and sat < 0.55
+                and val >= 0.55 and val <= 0.90 then
+                return "basic", "signature:common-pale-green-plastic"
             end
         end
 
         -- Rare: серебристый/серый Glass. Rate у ParticleEmitter может меняться
         -- или отсутствовать в разных клиентах, поэтому не делаем его обязательным.
-        -- Rate используется только как дополнительная проверка, если он есть.
+        -- Rate не обязателен: в разных клиентах/моментах частицы могут отличаться.
         if isGrey and sat < 0.18 and val >= 0.55 and val <= 0.92
             and rootPart.Material == Enum.Material.Glass then
-            if rate == nil or (rate >= 20 and rate <= 80) then
-                return "rare", "signature:rare-silver-glass"
-            end
+            return "rare", "signature:rare-silver-glass"
         end
     end
 
