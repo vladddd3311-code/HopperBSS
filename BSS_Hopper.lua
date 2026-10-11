@@ -1109,13 +1109,13 @@ end, "ErrorOccurred")
 
 -- Приоритет для лутающего: чем больше значение, тем раньше берёт
 local RARITY_PRIORITY = {
-    gummy     = 7,
-    supreme   = 6,
-    legendary = 5,
-    epic      = 4,
+    supreme   = 7,
+    legendary = 6,
+    epic      = 5,
+    gummy     = 4,
     rare      = 3,
-    basic     = 2,
-    moon      = 1,
+    moon      = 2,
+    basic     = 1,
 }
 
 local RARITY_LABEL = {
@@ -1145,9 +1145,8 @@ local RARITY_WORDS = {
     { level = "basic",     words = { "common", "normal", "basic" } },
 }
 
--- В фильтре используются только шесть требуемых уровней:
--- Moon → Basic/Common → Rare → Epic → Legendary → Supreme.
--- Gummy/Festive/Sticker/Debug — отдельные варианты, не маскируем их под Basic.
+-- Порядок редкости: Common → Moon → Rare → Gummy → Epic → Legendary → Supreme.
+-- Неизвестный росток по умолчанию относится к Supreme, если не совпал с Epic.
 local EXTRA_RARITY = { gummy = "gummy" }
 
 -- Ищем слово-маркер в строке
@@ -1361,6 +1360,15 @@ local function detectRarity(sprout)
             return "supreme", "signature:supreme-glowing-pale-green"
         end
 
+        -- Epic: подтверждённый образец пользователя RGB (169, 157, 175), Glass.
+        -- Размер не используется, так как росток может уменьшаться.
+        if part.Material == Enum.Material.Glass
+            and math.abs(r - (169 / 255)) <= 0.025
+            and math.abs(g - (157 / 255)) <= 0.025
+            and math.abs(b - (175 / 255)) <= 0.025 then
+            return "epic", "signature:epic-confirmed-rgb-glass"
+        end
+
         -- Rare: серебристо-серый Glass из подтверждённого образца.
         if isGrey and sat < 0.18 and val >= 0.55 and val <= 0.92
             and part.Material == Enum.Material.Glass then
@@ -1389,12 +1397,9 @@ local function detectRarity(sprout)
         end
     end
 
-    -- Epic и неизвестные варианты не определяем только по оттенку:
-    -- цвет детали/освещение могут дать ложное совпадение. Нужна явная
-    -- метка, атрибут или подтверждённая сигнатура для этого типа.
-
-    -- Важнее неизвестная редкость, чем ложный тип.
-    return nil, "unconfirmed"
+    -- Неизвестный росток по правилу пользователя считаем Supreme,
+    -- если он не совпал с одной из известных сигнатур выше.
+    return "supreme", "fallback:unknown-as-supreme"
 end
 
 -- Порог лутающего: выбранная редкость и все более высокие.
@@ -3100,7 +3105,7 @@ local fPlace = makeField(pageSettings, "PLACE ID", CONFIG.PLACE_ID,
 
 section("МИНИМАЛЬНАЯ РЕДКОСТЬ СПРУТА", 30).Parent = pageSettings
 
-local sproutRarityOrder = { "moon", "basic", "rare", "epic", "legendary", "supreme", "gummy" }
+local sproutRarityOrder = { "basic", "moon", "rare", "gummy", "epic", "legendary", "supreme" }
 local sproutRarityLabels = {
     moon = "Moon", basic = "Common", rare = "Rare", epic = "Epic",
     legendary = "Legendary", supreme = "Supreme", gummy = "Gummy",
@@ -3166,7 +3171,7 @@ paintSproutRarity()
 
 local sproutRarityHelp = new("TextLabel", {
     Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1,
-    Text = "Лутает выбранную редкость и выше. Неизвестные типы пропускаются, чтобы не перепутать Moon, Rare и Legendary.",
+    Text = "Порядок: Common → Moon → Rare → Gummy → Epic → Legendary → Supreme. Неизвестные ростки считаются Supreme.",
     TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 10,
     TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
     LayoutOrder = 32, Parent = pageSettings,
