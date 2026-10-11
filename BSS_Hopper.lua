@@ -554,11 +554,41 @@ end
 
 local function isPuffshroomRoot(obj)
     local name = string.lower(tostring(obj and obj.Name or ""))
-    -- Обычный Puffshroom в игре может называться просто "Sprout".
-    -- Не используем частичное совпадение "sprout", чтобы не ловить частицы/эффекты.
-    return string.find(name, "puffshroom", 1, true) ~= nil
-        or string.find(name, "puff shroom", 1, true) ~= nil
-        or name == "sprout"
+    if string.find(name, "puffshroom", 1, true)
+        or string.find(name, "puff shroom", 1, true) then
+        return true
+    end
+
+    -- Не считаем любой объект с именем "Sprout" грибом: на серверах
+    -- встречаются обычные/служебные объекты с таким именем, из-за чего
+    -- появлялся ложный COMMON level 1. Для имени Sprout требуется явный
+    -- Puffshroom-признак в самом объекте или его потомках.
+    if name ~= "sprout" then return false end
+    local ok, descendants = pcall(function() return obj:GetDescendants() end)
+    if not ok then return false end
+    for _, d in ipairs(descendants) do
+        local n = string.lower(tostring(d.Name or ""))
+        if string.find(n, "puffshroom", 1, true)
+            or string.find(n, "puff shroom", 1, true)
+            or string.find(n, "puffshroomlevel", 1, true) then
+            return true
+        end
+        if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+            local value = string.lower(tostring(d.Text or ""))
+            if string.find(value, "puffshroom", 1, true)
+                or string.find(value, "puff shroom", 1, true) then
+                return true
+            end
+        end
+    end
+    local attrsOk, attrs = pcall(function() return obj:GetAttributes() end)
+    if attrsOk then
+        for key in pairs(attrs) do
+            local k = string.lower(tostring(key))
+            if string.find(k, "puffshroom", 1, true) then return true end
+        end
+    end
+    return false
 end
 
 local function parsePuffshroom(root)
