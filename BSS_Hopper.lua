@@ -597,6 +597,36 @@ local function parsePuffshroom(root)
     return rarity, math.floor(level)
 end
 
+local function findPuffshroomTimer(root)
+    -- Ищем отображаемый таймер до исчезновения в GUI гриба.
+    local ok, descendants = pcall(function() return root:GetDescendants() end)
+    if ok then
+        for _, obj in ipairs(descendants) do
+            if obj:IsA("TextLabel") or obj:IsA("TextButton") or obj:IsA("TextBox") then
+                local textValue = tostring(obj.Text or "")
+                local minutes, seconds = string.match(textValue, "(%d+):(%d%d)")
+                if minutes and seconds and tonumber(seconds) < 60 then
+                    return tostring(tonumber(minutes)) .. ":" .. tostring(seconds)
+                end
+            end
+        end
+    end
+    local attrsOk, attrs = pcall(function() return root:GetAttributes() end)
+    if attrsOk then
+        for key, value in pairs(attrs) do
+            local lower = string.lower(tostring(key))
+            if string.find(lower, "time", 1, true) or string.find(lower, "remaining", 1, true)
+                or string.find(lower, "despawn", 1, true) then
+                local n = tonumber(value)
+                if n and n >= 0 and n <= 3600 then
+                    return string.format("%d:%02d", math.floor(n / 60), math.floor(n % 60))
+                end
+            end
+        end
+    end
+    return nil
+end
+
 local function findPuffshroom()
     local ok, descendants = pcall(function() return Workspace:GetDescendants() end)
     if not ok then return nil end
@@ -1570,7 +1600,7 @@ function Searcher:reportVicious(jobId, kind, fieldName)
     return false
 end
 
-function Searcher:reportPuffshroom(jobId, rarity, level, fieldName)
+function Searcher:reportPuffshroom(jobId, rarity, level, fieldName, timeRemaining)
     if not PUFF_RARITY_PRIORITY[rarity] then return false end
     local body = HttpService:JSONEncode({
         apiKey = CONFIG.API_KEY,
@@ -1579,6 +1609,7 @@ function Searcher:reportPuffshroom(jobId, rarity, level, fieldName)
         fieldName = fieldName or "unknown",
         rarity = rarity,
         level = level,
+        timeRemaining = timeRemaining,
         searcherTag = CONFIG.SELF_TAG,
         puffshroomChannelId = CONFIG.PUFFSHROOM_CHANNEL_ID,
     })
@@ -1621,7 +1652,7 @@ function Searcher:Start()
 
                 -- Puffshroom репортится независимо от того, найден ли спрут/Vicious.
                 phase = "поиск Puffshroom"
-                if false and CONFIG.CHECK_PUFFSHROOMS then
+                if CONFIG.CHECK_PUFFSHROOMS then
                     local puff, puffRarity, puffLevel = findPuffshroom()
                     local minimumPuff = PUFF_RARITY_PRIORITY[CONFIG.PUFF_MIN_RARITY] or 1
                     local foundPuff = puffRarity and (PUFF_RARITY_PRIORITY[puffRarity] or 0) >= minimumPuff
@@ -1631,7 +1662,8 @@ function Searcher:Start()
                             puffReported[key] = os.clock()
                             local puffField = detectField(puff)
                             log("Puffshroom", "Найден " .. puffRarity .. " level " .. tostring(puffLevel) .. " | поле=" .. tostring(puffField))
-                            self:reportPuffshroom(game.JobId, puffRarity, puffLevel, puffField)
+                            local puffTimer = findPuffshroomTimer(puff)
+                            self:reportPuffshroom(game.JobId, puffRarity, puffLevel, puffField, puffTimer)
                         end
                     elseif puff and puffRarity then
                         log("Puffshroom", "Пропущен " .. puffRarity .. ": ниже выбранного порога " .. tostring(CONFIG.PUFF_MIN_RARITY))
@@ -2700,13 +2732,14 @@ makeTab("⚙", "Настройки", "settings")
 for i = 1, 5 do
     local key = "soon" .. i
     local icon, label = "🔒", "Скоро"
+    local locked = true
     if i == 1 then
-        icon, label = "🐝", "Vicious Bee"
+        icon, label, locked = "🐝", "Vicious Bee", false
     elseif i == 2 then
-        icon, label = "🔒", "Puffshrooms (временно отключено)"
+        icon, label, locked = "🍄", "Puffshrooms", false
     end
 
-    local b = makeTab(icon, label, key, true)
+    local b = makeTab(icon, label, key, locked)
 
     local badge = new("TextLabel", {
         Size = UDim2.new(0, 20, 0, 16),
