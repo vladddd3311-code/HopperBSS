@@ -3415,7 +3415,53 @@ for i = 1, 5 do
             LayoutOrder = 6, Parent = p,
         })
 
-        section("НАСТРОЙКИ УВЕДОМЛЕНИЙ", 10).Parent = p
+        section("МИНИМАЛЬНЫЙ УРОВЕНЬ ПО РЕДКОСТИ (0–30)", 7).Parent = p
+        local puffLevelSettings = {
+            { key = "PUFF_MIN_LEVEL_COMMON", label = "Common" },
+            { key = "PUFF_MIN_LEVEL_RARE", label = "Rare" },
+            { key = "PUFF_MIN_LEVEL_EPIC", label = "Epic" },
+            { key = "PUFF_MIN_LEVEL_LEGENDARY", label = "Legendary" },
+            { key = "PUFF_MIN_LEVEL_MYTHIC", label = "Mythic" },
+        }
+        for index, setting in ipairs(puffLevelSettings) do
+            local row = new("Frame", {
+                Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.card,
+                BorderSizePixel = 0, LayoutOrder = 7 + index, Parent = p,
+            })
+            round(row, 8)
+            stroke(row)
+            new("TextLabel", {
+                Size = UDim2.new(1, -90, 1, 0), Position = UDim2.new(0, 10, 0, 0),
+                BackgroundTransparency = 1, Text = setting.label .. " — заходить от уровня",
+                TextColor3 = C.text, Font = Enum.Font.GothamMedium, TextSize = 11,
+                TextXAlignment = Enum.TextXAlignment.Left, Parent = row,
+            })
+            local levelBox = new("TextBox", {
+                Size = UDim2.new(0, 58, 0, 25), Position = UDim2.new(1, -68, 0.5, -12),
+                BackgroundColor3 = C.field, Text = tostring(math.clamp(tonumber(CONFIG[setting.key]) or 0, 0, 30)),
+                TextColor3 = C.text, Font = Enum.Font.GothamBold, TextSize = 12,
+                ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Center,
+                BorderSizePixel = 0, Parent = row,
+            })
+            round(levelBox, 6)
+            levelBox.FocusLost:Connect(function()
+                local value = tonumber(levelBox.Text)
+                if not value then value = tonumber(CONFIG[setting.key]) or 0 end
+                value = math.clamp(math.floor(value), 0, 30)
+                CONFIG[setting.key] = value
+                levelBox.Text = tostring(value)
+                saveNow()
+            end)
+        end
+        local puffLevelHelp = new("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 30), BackgroundTransparency = 1,
+            Text = "0 = не ограничивать уровень. Для каждой редкости свой порог; каждый найденный гриб отправляется отдельным сообщением.",
+            TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 10,
+            TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+            LayoutOrder = 13, Parent = p,
+        })
+
+        section("НАСТРОЙКИ УВЕДОМЛЕНИЙ", 14).Parent = p
         local puffChannel = new("TextLabel", {
             Size = UDim2.new(1, 0, 0, 46), BackgroundColor3 = C.card,
             Text = "Discord channel ID: " .. tostring(CONFIG.PUFFSHROOM_CHANNEL_ID) .. "\nКанал задаётся в конфигурации скрипта.",
