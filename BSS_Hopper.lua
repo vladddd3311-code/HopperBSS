@@ -1938,11 +1938,20 @@ end
 -- ── Atlas для лутающего ──
 function Looter:preloadAtlas()
     if not CONFIG.USE_ATLAS then return end
+    -- Берём ранее загруженный исходник из памяти executor: после хопа
+    -- повторная HTTP-загрузка не нужна.
+    local cached = PERSIST_ENV.BSS_ATLAS_SOURCE
+    if type(cached) == "string" and cached ~= "" then
+        self.atlasSource, self.atlasReady = cached, true
+        log("Лутающий", string.format("Atlas взят из кэша (%d байт)", #cached))
+        return
+    end
     task.spawn(function()
         local ok, src = pcall(function() return game:HttpGet(CONFIG.ATLAS_URL) end)
-        if ok and src and src ~= "" then
+        if ok and type(src) == "string" and src ~= "" then
             self.atlasSource, self.atlasReady = src, true
-            log("Лутающий", string.format("Atlas предзагружен (%d байт)", #src))
+            PERSIST_ENV.BSS_ATLAS_SOURCE = src
+            log("Лутающий", string.format("Atlas предзагружен и сохранён в кэш (%d байт)", #src))
         else
             log("Лутающий", "Atlas недоступен")
         end
@@ -1953,14 +1962,14 @@ function Looter:runAtlas()
     if self.atlasLoaded or not CONFIG.USE_ATLAS then return end
     self.stats.currentStatus = "Запускаю Atlas..."
     task.spawn(function()
-        local source = self.atlasSource
-        if not (self.atlasReady and source and source ~= "") then
+        local source = self.atlasSource or PERSIST_ENV.BSS_ATLAS_SOURCE
+        if not (type(source) == "string" and source ~= "") then
             local waited = 0
-            while not self.atlasReady and waited < 5 do
-                task.wait(0.05)
-                waited += 0.05
+            while not self.atlasReady and waited < 0.75 do
+                task.wait(0.025)
+                waited += 0.025
             end
-            source = (self.atlasReady and self.atlasSource) or nil
+            source = (self.atlasReady and self.atlasSource) or PERSIST_ENV.BSS_ATLAS_SOURCE
         end
         if not source or source == "" then
             local okFetch, fetched = pcall(function() return game:HttpGet(CONFIG.ATLAS_URL) end)
@@ -2372,11 +2381,18 @@ end
 
 function Solo:preloadAtlas()
     if not CONFIG.USE_ATLAS then return end
+    local cached = PERSIST_ENV.BSS_ATLAS_SOURCE
+    if type(cached) == "string" and cached ~= "" then
+        self.atlasSource, self.atlasReady = cached, true
+        log("Соло", string.format("Atlas взят из кэша (%d байт)", #cached))
+        return
+    end
     task.spawn(function()
         local ok, src = pcall(function() return game:HttpGet(CONFIG.ATLAS_URL) end)
-        if ok and src and src ~= "" then
+        if ok and type(src) == "string" and src ~= "" then
             self.atlasSource, self.atlasReady = src, true
-            log("Соло", string.format("Atlas предзагружен (%d байт)", #src))
+            PERSIST_ENV.BSS_ATLAS_SOURCE = src
+            log("Соло", string.format("Atlas предзагружен и сохранён в кэш (%d байт)", #src))
         else
             log("Соло", "Atlas недоступен")
         end
@@ -2386,14 +2402,14 @@ end
 function Solo:runAtlas()
     if self.atlasLoaded or not CONFIG.USE_ATLAS then return end
     task.spawn(function()
-        local source = self.atlasSource
-        if not (self.atlasReady and source and source ~= "") then
+        local source = self.atlasSource or PERSIST_ENV.BSS_ATLAS_SOURCE
+        if not (type(source) == "string" and source ~= "") then
             local waited = 0
-            while not self.atlasReady and waited < 5 do
-                task.wait(0.05)
-                waited += 0.05
+            while not self.atlasReady and waited < 0.75 do
+                task.wait(0.025)
+                waited += 0.025
             end
-            source = (self.atlasReady and self.atlasSource) or nil
+            source = (self.atlasReady and self.atlasSource) or PERSIST_ENV.BSS_ATLAS_SOURCE
         end
         if not source or source == "" then
             local okFetch, fetched = pcall(function() return game:HttpGet(CONFIG.ATLAS_URL) end)
