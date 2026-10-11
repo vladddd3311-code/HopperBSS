@@ -1152,21 +1152,12 @@ local function rarityFromColor(color)
         return "epic"
     end
 
-    -- Бирюзовый (Legendary): бирюза стоит около 180°, но при подсветке
-    -- смещается к 195-200. Верхнюю границу держим ниже 197.
-    if deg >= 150 and deg <= 197 and s > 0.30 then
-        return "legendary"
-    end
-
-    -- Чисто синий оттенок может быть Moon, но голубой оттенок около 200°
-    -- различаем по подтверждённому Sparkles Rate в detectRarity:
-    -- Moon = низкий Rate, Legendary = высокий Rate.
-    if deg >= 220 and deg <= 270 and s > 0.20 then
-        return "moon"
-    end
-
-    -- Голубая зона 195-219 неоднозначна без материала и Sparkles Rate.
-    if deg >= 195 and deg < 220 then
+    -- Moon и Legendary нельзя надёжно различить только по цвету:
+    -- оба могут попадать в голубую/бирюзовую область при разном освещении.
+    -- Поэтому эта функция НЕ присваивает им редкость по одному Hue.
+    -- Их определяет detectRarity по Neon + Sparkles Rate:
+    -- Moon = Rate <= 20, Legendary = Rate >= 100.
+    if deg >= 150 and deg <= 270 and s > 0.20 then
         return nil
     end
 
