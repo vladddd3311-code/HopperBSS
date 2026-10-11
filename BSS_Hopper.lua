@@ -1266,13 +1266,21 @@ local function detectRarity(sprout)
 
     local rate = sproutSparklesRate(sprout)
     local hasGlow = sproutHasGlow(sprout)
+
+    -- ВАЖНО: сначала проверяем все специфические сигнатуры целиком.
+    -- Нельзя возвращать Common по первой зелёной декоративной детали,
+    -- пока ещё не проверены остальные части модели.
+    local hasMoonLegendaryCandidate = false
     for _, part in ipairs(parts) do
         local h, sat, val = hueOf(part.Color)
         local deg = h * 360
         local r, g, b = part.Color.R, part.Color.G, part.Color.B
         local isGrey = math.abs(r - g) < 0.06 and math.abs(g - b) < 0.06
 
-        -- Подтверждённые похожие голубые Moon/Legendary различаем по Rate.
+        -- Moon / Legendary: по подтверждённым образцам отличается Rate.
+        if part.Material == Enum.Material.Neon and deg >= 195 and deg <= 220 then
+            hasMoonLegendaryCandidate = true
+        end
         if part.Material == Enum.Material.Neon and deg >= 195 and deg <= 220 and rate then
             if rate <= 20 then
                 return "moon", "signature:moon-neon-low-sparkles"
@@ -1280,59 +1288,55 @@ local function detectRarity(sprout)
                 return "legendary", "signature:legendary-neon-high-sparkles"
             end
         end
+    end
 
-        -- Common: RGB-сигнатура из присланного образца (бледно-серо-зелёный Plastic).
+    -- Второй проход: отличительные сигнатуры, которые не должны быть
+    -- перекрыты Common/декоративными деталями.
+    for _, part in ipairs(parts) do
+        local h, sat, val = hueOf(part.Color)
+        local deg = h * 360
+        local r, g, b = part.Color.R, part.Color.G, part.Color.B
+        local isGrey = math.abs(r - g) < 0.06 and math.abs(g - b) < 0.06
         local paleGreenPlastic = part.Material == Enum.Material.Plastic
             and g >= r and g >= b and (g - r) >= 0.015
             and (g - b) >= 0.005 and val >= 0.55 and val <= 0.90
 
-        if deg > 62 and deg < 150 and sat > 0.15 then
-            if hasGlow then
-                return "supreme", "signature:supreme-glowing-green"
-            elseif paleGreenPlastic then
-                return "basic", "signature:common-pale-green-plastic"
-            end
-        elseif paleGreenPlastic then
-            if hasGlow then
-                return "supreme", "signature:supreme-glowing-pale-green"
-            end
-            return "basic", "signature:common-pale-green-plastic-rgb"
+        -- Gummy: присланный образец — насыщенный розово-фиолетовый Glass.
+        if part.Material == Enum.Material.Glass
+            and deg >= 285 and deg <= 350 and sat >= 0.48 and val >= 0.35 then
+            return "gummy", "signature:gummy-magenta-glass"
         end
 
-        -- Rare: серебристо-серый Glass; Sparkles Rate не обязателен.
+        -- Supreme: зелёный росток должен одновременно иметь признаки свечения.
+        if deg > 62 and deg < 150 and sat > 0.15 and hasGlow then
+            return "supreme", "signature:supreme-glowing-green"
+        end
+        if paleGreenPlastic and hasGlow then
+            return "supreme", "signature:supreme-glowing-pale-green"
+        end
+
+        -- Rare: серебристо-серый Glass из подтверждённого образца.
         if isGrey and sat < 0.18 and val >= 0.55 and val <= 0.92
             and part.Material == Enum.Material.Glass then
             return "rare", "signature:rare-silver-glass"
         end
     end
 
-    -- 5) Считаем цветные детали модели целиком, а не возвращаем результат
-    -- по первой случайной детали. Нейтральный серый учитываем только при
-    -- совпадении нескольких деталей; одиночная деталь не подтверждает Rare.
-    local counts = { gummy = 0, supreme = 0, legendary = 0, epic = 0, rare = 0, basic = 0, moon = 0 }
-    local okDesc, descendants = pcall(function() return sprout:GetDescendants() end)
-    if okDesc then
-        local function addPart(part)
-            local rarity = rarityFromColor(part.Color)
-            if rarity then
-                counts[rarity] = (counts[rarity] or 0) + 1
-            end
-        end
-        if sprout:IsA("BasePart") then addPart(sprout) end
-        for _, d in ipairs(descendants) do
-            if d:IsA("BasePart") then addPart(d) end
-        end
-
-        local best, bestCount = nil, 0
-        for rarity, count in pairs(counts) do
-            if count > bestCount then
-                best, bestCount = rarity, count
-            end
-        end
-        if best and bestCount >= 2 then
-            return best, "dominant-part-color"
+    -- Common проверяем последним, чтобы не перебить более редкую деталь.
+    for _, part in ipairs(parts) do
+        local _, sat, val = hueOf(part.Color)
+        local r, g, b = part.Color.R, part.Color.G, part.Color.B
+        local paleGreenPlastic = part.Material == Enum.Material.Plastic
+            and g >= r and g >= b and (g - r) >= 0.015
+            and (g - b) >= 0.005 and val >= 0.55 and val <= 0.90
+        if paleGreenPlastic and not hasGlow then
+            return "basic", "signature:common-pale-green-plastic"
         end
     end
+
+    -- Epic и неизвестные варианты не определяем только по оттенку:
+    -- цвет детали/освещение могут дать ложное совпадение. Нужна явная
+    -- метка, атрибут или подтверждённая сигнатура для этого типа.
 
     -- Важнее неизвестная редкость, чем ложный тип.
     return nil, "unconfirmed"
