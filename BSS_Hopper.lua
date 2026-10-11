@@ -355,10 +355,30 @@ end
 
 isSprout = function(obj)
     if not obj then return false end
-    local ok, name = pcall(function() return obj.Name end)
-    if not ok or type(name) ~= "string" then return false end
+    local ok, name, className, parent = pcall(function()
+        return obj.Name, obj.ClassName, obj.Parent
+    end)
+    if not ok or type(name) ~= "string" or not parent then return false end
     local low = string.lower(name)
-    return low == "sprout" or string.find(low, "sprout", 1, true) ~= nil
+    if low ~= "sprout" and not string.find(low, "sprout", 1, true) then
+        return false
+    end
+
+    -- Не считать папки/контейнеры с названием Sprout настоящим ростком.
+    -- Кандидат должен быть физическим объектом или Model с деталями.
+    if className == "BasePart" then return true end
+    if className ~= "Model" then return false end
+    local okParts, descendants = pcall(function() return obj:GetDescendants() end)
+    if not okParts then return false end
+    for _, d in ipairs(descendants) do
+        if d:IsA("BasePart") then
+            -- Отбрасываем оставшиеся пустые/невидимые объекты после сбора.
+            if d.Transparency < 1 and d.Size.Magnitude > 0.05 then
+                return true
+            end
+        end
+    end
+    return false
 end
 
 -- Флаг freshSprout объявлен выше, чтобы callbacks захватывали именно local-переменную.
@@ -404,9 +424,10 @@ task.spawn(function()
 end)
 
 local function findSprout()
-    -- Только что появившийся имеет приоритет
+    -- Только что появившийся имеет приоритет, но проверяем, что это реальный
+    -- физический объект ростка, а не старый контейнер/пустой остаток.
     if freshSprout then
-        if freshSprout.Parent then
+        if freshSprout.Parent and isSprout(freshSprout) then
             return freshSprout
         end
         freshSprout = nil
