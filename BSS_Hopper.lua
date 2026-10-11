@@ -1135,8 +1135,7 @@ end
 -- чтобы не спутать "Legendary" с чем-то общим.
 local RARITY_WORDS = {
     { level = "gummy",     words = { "gummy" } },
-    { level = "supreme",   words = { "supreme" } },
-    { level = "legendary", words = { "legendary" } },
+     { level = "legendary", words = { "legendary" } },
     { level = "epic",      words = { "epic" } },
     { level = "rare",      words = { "uncommon", "rare" } },
     { level = "moon",      words = { "moon", "lunar" } },
@@ -1272,8 +1271,7 @@ local function detectRarity(sprout)
                     or string.find(txt, "common", 1, true)
                     or string.find(txt, "rare", 1, true)
                     or string.find(txt, "epic", 1, true)
-                    or string.find(txt, "supreme", 1, true)
-                    or string.find(txt, "gummy", 1, true)
+                     or string.find(txt, "gummy", 1, true)
                     or string.find(txt, "moon", 1, true)) then
                     return found, "gui-explicit"
                 end
@@ -3098,7 +3096,7 @@ section("МИНИМАЛЬНАЯ РЕДКОСТЬ СПРУТА", 30).Parent = pag
 local sproutRarityOrder = { "basic", "moon", "rare", "gummy", "epic", "legendary" }
 local sproutRarityLabels = {
     moon = "Moon", basic = "Common", rare = "Rare", epic = "Epic",
-    legendary = "Legendary", supreme = "Supreme", gummy = "Gummy",
+    legendary = "Legendary", gummy = "Gummy",
 }
 local sproutRarityColors = {
     moon = Color3.fromRGB(105, 190, 255),
@@ -3106,8 +3104,7 @@ local sproutRarityColors = {
     rare = Color3.fromRGB(190, 200, 210),
     epic = Color3.fromRGB(255, 195, 70),
     legendary = Color3.fromRGB(75, 220, 205),
-    supreme = Color3.fromRGB(100, 255, 110),
-    gummy = Color3.fromRGB(255, 115, 220),
+     gummy = Color3.fromRGB(255, 115, 220),
 }
 if not RARITY_PRIORITY[CONFIG.MIN_RARITY] then CONFIG.MIN_RARITY = "basic" end
 
