@@ -575,7 +575,9 @@ local function parsePuffshroom(root)
     for _, r in ipairs({"mythic", "legendary", "epic", "rare", "common"}) do
         if string.find(text, r, 1, true) then rarity = r; break end
     end
-    if not rarity then return nil end
+    -- В игре Common может отображаться просто как "Puffshroom"/"Sprout"
+    -- без слова Common. Если это точно Puffshroom-объект и уровень удалось
+    -- прочитать ниже, отсутствие подписи редкости трактуем как Common.
     local level
     -- Common attribute formats: Level=12, Lvl 12, Level 12, PuffshroomLevel.
     local patterns = {"level%s*[:=]?%s*(%d+)", "lvl%s*[:=]?%s*(%d+)", "puffshroomlevel%s*[:=]?%s*(%d+)"}
@@ -594,6 +596,9 @@ local function parsePuffshroom(root)
         end)
     end
     if not level or level < 1 or level > 30 then return nil end
+    -- Не подписанная редкость = Common, но только для объекта, имя которого
+    -- уже прошло isPuffshroomRoot() и у которого найден валидный уровень.
+    rarity = rarity or "common"
     return rarity, math.floor(level)
 end
 
@@ -1613,13 +1618,21 @@ function Searcher:reportPuffshroom(jobId, rarity, level, fieldName, timeRemainin
         searcherTag = CONFIG.SELF_TAG,
         puffshroomChannelId = CONFIG.PUFFSHROOM_CHANNEL_ID,
     })
-    local ok, resp = pcall(function() return postJson("/puffshroom", body) end)
-    if ok and not responseRejected(resp) then
-        log("Puffshroom", "Репорт отправлен: " .. rarity .. " level " .. tostring(level) .. " | " .. tostring(fieldName))
-        self.stats.reportsSent += 1
-        return true
+    local lastError = "нет ответа"
+    -- Повторяем отправку до телепорта/выхода: краткий сбой сети больше не
+    -- должен терять найденный гриб.
+    for attempt = 1, 3 do
+        local ok, resp = pcall(function() return postJson("/puffshroom", body) end)
+        if ok and not responseRejected(resp) then
+            log("Puffshroom", "Репорт подтверждён (попытка " .. tostring(attempt) .. "): " .. rarity .. " level " .. tostring(level) .. " | " .. tostring(fieldName))
+            self.stats.reportsSent += 1
+            return true
+        end
+        lastError = tostring(resp)
+        log("Puffshroom", "Не отправлено, попытка " .. tostring(attempt) .. "/3: " .. lastError)
+        if attempt < 3 then task.wait(attempt * 0.75) end
     end
-    log("Puffshroom", "Ошибка репорта: " .. tostring(resp))
+    log("Puffshroom", "ОШИБКА репорта после 3 попыток: " .. lastError)
     return false
 end
 
