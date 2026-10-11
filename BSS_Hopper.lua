@@ -595,9 +595,17 @@ local function parsePuffshroom(root)
             end
         end)
     end
+    -- Некоторые обычные ростки в BSS не имеют ни текста уровня, ни атрибута.
+    -- Если объект называется ровно "Sprout", считаем его Common даже без уровня;
+    -- уровень 1 используется только как техническое значение для фильтрации.
+    -- Это позволяет обнаружить Common при минимальном уровне 0 и не затрагивает
+    -- именованные Rare/Epic/Legendary/Mythic Puffshrooms.
+    if (not level or level < 1 or level > 30) and rootName == "sprout" then
+        rarity = "common"
+        level = 1
+    end
     if not level or level < 1 or level > 30 then return nil end
-    -- Не подписанная редкость = Common, но только для объекта, имя которого
-    -- уже прошло isPuffshroomRoot() и у которого найден валидный уровень.
+    -- Отсутствующая подпись редкости у точно распознанного Puffshroom = Common.
     rarity = rarity or "common"
     return rarity, math.floor(level)
 end
