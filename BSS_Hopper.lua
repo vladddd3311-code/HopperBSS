@@ -1261,19 +1261,28 @@ local function detectRarity(sprout)
         end
     end
 
-    -- 4) Сначала проверяем известные сигнатуры корневой детали.
-    -- Moon и Legendary в присланных дампах имеют похожий голубой цвет и Neon,
-    -- но отличаются Sparkles Rate: Moon=10, Legendary=150.
-    local rootPart = sprout:IsA("BasePart") and sprout
-        or sprout:FindFirstChildWhichIsA("BasePart", true)
-    if rootPart then
-        local h, sat, val = hueOf(rootPart.Color)
+    -- 4) Проверяем ВСЕ детали объекта, а не первую найденную BasePart.
+    -- У Roblox-моделей первой деталью может оказаться декоративный Spotlight,
+    -- поэтому решение по одной случайной детали давало unconfirmed.
+    local parts = {}
+    if sprout:IsA("BasePart") then table.insert(parts, sprout) end
+    local okParts, descendantsForParts = pcall(function() return sprout:GetDescendants() end)
+    if okParts then
+        for _, d in ipairs(descendantsForParts) do
+            if d:IsA("BasePart") then table.insert(parts, d) end
+        end
+    end
+
+    local rate = sproutSparklesRate(sprout)
+    local hasGlow = sproutHasGlow(sprout)
+    for _, part in ipairs(parts) do
+        local h, sat, val = hueOf(part.Color)
         local deg = h * 360
-        local rate = sproutSparklesRate(sprout)
-        local r, g, b = rootPart.Color.R, rootPart.Color.G, rootPart.Color.B
+        local r, g, b = part.Color.R, part.Color.G, part.Color.B
         local isGrey = math.abs(r - g) < 0.06 and math.abs(g - b) < 0.06
 
-        if rootPart.Material == Enum.Material.Neon and deg >= 195 and deg <= 220 and rate then
+        -- Подтверждённые похожие голубые Moon/Legendary различаем по Rate.
+        if part.Material == Enum.Material.Neon and deg >= 195 and deg <= 220 and rate then
             if rate <= 20 then
                 return "moon", "signature:moon-neon-low-sparkles"
             elseif rate >= 100 then
@@ -1281,34 +1290,27 @@ local function detectRarity(sprout)
             end
         end
 
-        -- Supreme и Common: сначала проверяем цвет + материал + эффект.
-        -- Rate не обязателен для Common: в некоторых клиентах ParticleEmitter
-        -- может отсутствовать или иметь другое значение.
-        -- Common из подтверждённого дампа почти серо-зелёный:
-        -- RGB примерно (0.706, 0.745, 0.729), Plastic. Поэтому hue/saturation
-        -- может не попасть в зелёный диапазон — проверяем RGB напрямую.
-        local paleGreenPlastic = rootPart.Material == Enum.Material.Plastic
+        -- Common: RGB-сигнатура из присланного образца (бледно-серо-зелёный Plastic).
+        local paleGreenPlastic = part.Material == Enum.Material.Plastic
             and g >= r and g >= b and (g - r) >= 0.015
             and (g - b) >= 0.005 and val >= 0.55 and val <= 0.90
 
         if deg > 62 and deg < 150 and sat > 0.15 then
-            if sproutHasGlow(sprout) then
+            if hasGlow then
                 return "supreme", "signature:supreme-glowing-green"
             elseif paleGreenPlastic then
                 return "basic", "signature:common-pale-green-plastic"
             end
         elseif paleGreenPlastic then
-            if sproutHasGlow(sprout) then
+            if hasGlow then
                 return "supreme", "signature:supreme-glowing-pale-green"
             end
             return "basic", "signature:common-pale-green-plastic-rgb"
         end
 
-        -- Rare: серебристый/серый Glass. Rate у ParticleEmitter может меняться
-        -- или отсутствовать в разных клиентах, поэтому не делаем его обязательным.
-        -- Rate не обязателен: в разных клиентах/моментах частицы могут отличаться.
+        -- Rare: серебристо-серый Glass; Sparkles Rate не обязателен.
         if isGrey and sat < 0.18 and val >= 0.55 and val <= 0.92
-            and rootPart.Material == Enum.Material.Glass then
+            and part.Material == Enum.Material.Glass then
             return "rare", "signature:rare-silver-glass"
         end
     end
