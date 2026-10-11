@@ -437,16 +437,27 @@ local function findSprout()
         freshSprout = nil
     end
 
+    -- Сначала проверяем известные папки.
     for _, folder in ipairs(sproutFolders) do
-        -- Search recursively so already-present/nested sprouts are not missed.
         local ok, descendants = pcall(function() return folder:GetDescendants() end)
         if ok then
             for _, child in ipairs(descendants) do
                 if isSprout(child) then return child end
             end
         end
-        -- A folder/model can itself be the sprout root.
         if isSprout(folder) then return folder end
+    end
+
+    -- Резервный полный поиск по Workspace: в разных версиях BSS
+    -- росток может оказаться в другой папке, не только Particles.Folder2.
+    local okWorkspace, all = pcall(function() return Workspace:GetDescendants() end)
+    if okWorkspace then
+        for _, child in ipairs(all) do
+            if isSprout(child) then
+                log("Спрут", "Найден полным поиском Workspace: " .. tostring(child:GetFullName()))
+                return child
+            end
+        end
     end
     return nil
 end
@@ -1351,9 +1362,18 @@ local function detectRarity(sprout)
     for _, part in ipairs(parts) do
         local _, sat, val = hueOf(part.Color)
         local r, g, b = part.Color.R, part.Color.G, part.Color.B
+        -- Точная сигнатура Common из дампа пользователя:
+        -- RGB примерно (0.706, 0.745, 0.729), Plastic / Sage green.
+        -- Допуск нужен для округления Color3 и небольших различий клиента.
+        local knownCommonColor = math.abs(r - 0.706) <= 0.055
+            and math.abs(g - 0.745) <= 0.055
+            and math.abs(b - 0.729) <= 0.055
         local paleGreenPlastic = part.Material == Enum.Material.Plastic
             and g >= r and g >= b and (g - r) >= 0.015
             and (g - b) >= 0.005 and val >= 0.55 and val <= 0.90
+        if part.Material == Enum.Material.Plastic and knownCommonColor and not hasGlow then
+            return "basic", "signature:common-confirmed-rgb-plastic"
+        end
         if paleGreenPlastic and not hasGlow then
             return "basic", "signature:common-pale-green-plastic"
         end
