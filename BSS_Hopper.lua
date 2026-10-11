@@ -1215,6 +1215,7 @@ local RARITY_PRIORITY = {
     rare      = 3,
     moon      = 2,
     basic     = 1,
+    common    = 0,
 }
 
 local RARITY_LABEL = {
@@ -1224,6 +1225,7 @@ local RARITY_LABEL = {
     rare      = "🥈 Rare",
     basic     = "🌱 Basic",
     moon      = "🌙 Moon",
+    common    = "⚪ Common Sprout",
 }
 
 local function hueOf(color)
@@ -1828,12 +1830,19 @@ function Searcher:Start()
                             s.currentStatus = "Репорт не дошёл, хопаю"
                         end
                     else
-                        -- Сохраняем диагностику в обычном логе, чтобы было понятно,
-                        -- почему росток не попал в Discord и что нужно прислать для фикса.
-                        s.currentStatus = "Росток найден, редкость не подтверждена"
-                        log("Ищущий", "Росток найден, но редкость не подтверждена; репорт не отправлен | source=" ..
-                            tostring(source) .. " | object=" .. tostring(sprout:GetFullName()) ..
-                            " | добавь DEBUG_SPROUT=true и пришли дамп")
+                        -- Если редкость не удалось определить, отправляем росток как Common Sprout.
+                        local fallbackRarity = "common"
+                        s.currentStatus = "Репортую Common Sprout"
+                        log("Ищущий", "Редкость не определена — отправляю как Common Sprout | source=" ..
+                            tostring(source) .. " | object=" .. tostring(sprout:GetFullName()))
+                        if self:report(game.JobId, fallbackRarity, fieldName) then
+                            s.lastSprout = {
+                                fieldName = "⚪ Common Sprout @ " .. tostring(fieldName or "?"),
+                            }
+                            s.currentStatus = "Common Sprout найден — репорт отправлен"
+                        else
+                            s.currentStatus = "Common Sprout найден — репорт не дошёл"
+                        end
                     end
 
                     task.wait(tonumber(CONFIG.REPORT_DELAY) or 2.5)
