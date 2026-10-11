@@ -1109,7 +1109,6 @@ end, "ErrorOccurred")
 
 -- Приоритет для лутающего: чем больше значение, тем раньше берёт
 local RARITY_PRIORITY = {
-    supreme   = 7,
     legendary = 6,
     epic      = 5,
     gummy     = 4,
@@ -1120,7 +1119,6 @@ local RARITY_PRIORITY = {
 
 local RARITY_LABEL = {
     gummy     = "🍬 Gummy",
-    supreme   = "🌟 Supreme",
     legendary = "💠 Legendary",
     epic      = "🥇 Epic",
     rare      = "🥈 Rare",
@@ -1352,14 +1350,6 @@ local function detectRarity(sprout)
             return "gummy", "signature:gummy-magenta-glass"
         end
 
-        -- Supreme: зелёный росток должен одновременно иметь признаки свечения.
-        if deg > 62 and deg < 150 and sat > 0.15 and hasGlow then
-            return "supreme", "signature:supreme-glowing-green"
-        end
-        if paleGreenPlastic and hasGlow then
-            return "supreme", "signature:supreme-glowing-pale-green"
-        end
-
         -- Epic: подтверждённый образец пользователя RGB (169, 157, 175), Glass.
         -- Размер не используется, так как росток может уменьшаться.
         if part.Material == Enum.Material.Glass
@@ -1397,9 +1387,9 @@ local function detectRarity(sprout)
         end
     end
 
-    -- Неизвестный росток по правилу пользователя считаем Supreme,
-    -- если он не совпал с одной из известных сигнатур выше.
-    return "supreme", "fallback:unknown-as-supreme"
+    -- Неизвестный росток не считаем редкостью автоматически:
+    -- это предотвращает случайный выбор Supreme по любому незнакомому цвету.
+    return nil, "unconfirmed"
 end
 
 -- Порог лутающего: выбранная редкость и все более высокие.
@@ -3105,7 +3095,7 @@ local fPlace = makeField(pageSettings, "PLACE ID", CONFIG.PLACE_ID,
 
 section("МИНИМАЛЬНАЯ РЕДКОСТЬ СПРУТА", 30).Parent = pageSettings
 
-local sproutRarityOrder = { "basic", "moon", "rare", "gummy", "epic", "legendary", "supreme" }
+local sproutRarityOrder = { "basic", "moon", "rare", "gummy", "epic", "legendary" }
 local sproutRarityLabels = {
     moon = "Moon", basic = "Common", rare = "Rare", epic = "Epic",
     legendary = "Legendary", supreme = "Supreme", gummy = "Gummy",
@@ -3171,7 +3161,7 @@ paintSproutRarity()
 
 local sproutRarityHelp = new("TextLabel", {
     Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1,
-    Text = "Порядок: Common → Moon → Rare → Gummy → Epic → Legendary → Supreme. Неизвестные ростки считаются Supreme.",
+    Text = "Порядок: Common → Moon → Rare → Gummy → Epic → Legendary. Неизвестные ростки пропускаются.",
     TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 10,
     TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
     LayoutOrder = 32, Parent = pageSettings,
