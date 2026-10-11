@@ -1158,13 +1158,15 @@ local function rarityFromColor(color)
         return "legendary"
     end
 
-    -- Синий (Moon): светящийся синий ~215-245, но может уходить в 205
-    if deg >= 203 and deg <= 270 and s > 0.20 then
+    -- Чисто синий оттенок может быть Moon, но голубой оттенок около 200°
+    -- различаем по подтверждённому Sparkles Rate в detectRarity:
+    -- Moon = низкий Rate, Legendary = высокий Rate.
+    if deg >= 220 and deg <= 270 and s > 0.20 then
         return "moon"
     end
 
-    -- Зона 198-202 — неоднозначная, не угадываем
-    if deg > 197 and deg < 203 then
+    -- Голубая зона 195-219 неоднозначна без материала и Sparkles Rate.
+    if deg >= 195 and deg < 220 then
         return nil
     end
 
@@ -1183,6 +1185,39 @@ local function rarityFromColor(color)
     if isGrey and v > 0.92 then return nil end
 
     return nil
+end
+
+-- Свойства, отличающие визуально похожие ростки.
+local function sproutSparklesRate(sprout)
+    local bestRate = nil
+    local ok, descendants = pcall(function() return sprout:GetDescendants() end)
+    if ok then
+        for _, d in ipairs(descendants) do
+            if d:IsA("ParticleEmitter") and string.lower(tostring(d.Name)) == "sparkles" then
+                local rate = tonumber(d.Rate)
+                if rate and (bestRate == nil or rate > bestRate) then bestRate = rate end
+            end
+        end
+    end
+    return bestRate
+end
+
+local function sproutHasGlow(sprout)
+    local function partGlows(obj)
+        if obj:IsA("BasePart") and obj.Material == Enum.Material.Neon then return true end
+        return false
+    end
+
+    if partGlows(sprout) then return true end
+    local ok, descendants = pcall(function() return sprout:GetDescendants() end)
+    if not ok then return false end
+    for _, d in ipairs(descendants) do
+        if partGlows(d) or d:IsA("PointLight") or d:IsA("SpotLight")
+            or d:IsA("SurfaceLight") or d:IsA("Highlight") then
+            return true
+        end
+    end
+    return false
 end
 
 -- Полное определение разновидности
@@ -1224,15 +1259,49 @@ local function detectRarity(sprout)
         end
     end
 
-    -- 4) Считаем цветные детали модели целиком, а не возвращаем результат
-    -- по первой случайной серой/белой детали. Серый цвет сам по себе
-    -- НЕ доказывает Rare: у обычных моделей много нейтральных деталей.
-    local counts = { gummy = 0, basic = 0, supreme = 0, epic = 0, legendary = 0, moon = 0 }
+    -- 4) Сначала проверяем известные сигнатуры корневой детали.
+    -- Moon и Legendary в присланных дампах имеют похожий голубой цвет и Neon,
+    -- но отличаются Sparkles Rate: Moon=10, Legendary=150.
+    local rootPart = sprout:IsA("BasePart") and sprout
+        or sprout:FindFirstChildWhichIsA("BasePart", true)
+    if rootPart then
+        local h, sat, val = hueOf(rootPart.Color)
+        local deg = h * 360
+        local rate = sproutSparklesRate(sprout)
+        local r, g, b = rootPart.Color.R, rootPart.Color.G, rootPart.Color.B
+        local isGrey = math.abs(r - g) < 0.06 and math.abs(g - b) < 0.06
+
+        if rootPart.Material == Enum.Material.Neon and deg >= 195 and deg <= 220 and rate then
+            if rate <= 20 then
+                return "moon", "signature:moon-neon-low-sparkles"
+            elseif rate >= 100 then
+                return "legendary", "signature:legendary-neon-high-sparkles"
+            end
+        end
+
+        -- Supreme: насыщенный зелёный с эффектом свечения; обычный Common
+        -- из дампа был бледно-зелёным Plastic без свечения.
+        if deg > 62 and deg < 150 and sat >= 0.65 and sproutHasGlow(sprout) then
+            return "supreme", "signature:supreme-glowing-green"
+        end
+
+        -- Rare: подтверждённый серебристый Glass с Sparkles Rate около 50.
+        if isGrey and sat < 0.18 and val >= 0.55 and val <= 0.92
+            and rootPart.Material == Enum.Material.Glass and rate
+            and rate >= 35 and rate <= 60 then
+            return "rare", "signature:rare-silver-glass"
+        end
+    end
+
+    -- 5) Считаем цветные детали модели целиком, а не возвращаем результат
+    -- по первой случайной детали. Нейтральный серый учитываем только при
+    -- совпадении нескольких деталей; одиночная деталь не подтверждает Rare.
+    local counts = { gummy = 0, supreme = 0, legendary = 0, epic = 0, rare = 0, basic = 0, moon = 0 }
     local okDesc, descendants = pcall(function() return sprout:GetDescendants() end)
     if okDesc then
         local function addPart(part)
             local rarity = rarityFromColor(part.Color)
-            if rarity and rarity ~= "rare" then
+            if rarity then
                 counts[rarity] = (counts[rarity] or 0) + 1
             end
         end
@@ -1252,8 +1321,47 @@ local function detectRarity(sprout)
         end
     end
 
-    -- Важнее неизвестная редкость, чем ложный Rare из-за белой/серой детали.
+    -- Важнее неизвестная редкость, чем ложный тип.
     return nil, "unconfirmed"
+end
+
+-- Порог лутающего: выбранная редкость и все более высокие.
+local function isRarityAtLeast(rarity, minimum)
+    local got = rarity and RARITY_PRIORITY[rarity]
+    local minValue = RARITY_PRIORITY[string.lower(tostring(minimum or "basic"))]
+        or RARITY_PRIORITY.basic
+    return got ~= nil and got >= minValue
+end
+
+local function isSproutEligible(sprout)
+    local rarity, source = detectRarity(sprout)
+    return isRarityAtLeast(rarity, CONFIG.MIN_RARITY), rarity, source
+end
+
+-- Ищет лучший из доступных ростков, который проходит выбранный порог.
+-- Неподтверждённые и более низкие редкости не лутаются.
+local function findLootableSprout()
+    local best, bestPriority = nil, -1
+    local function consider(obj)
+        if not obj or not isSprout(obj) then return end
+        local eligible, rarity = isSproutEligible(obj)
+        local priority = rarity and RARITY_PRIORITY[rarity] or -1
+        if eligible and priority > bestPriority then
+            best, bestPriority = obj, priority
+        end
+    end
+
+    if freshSprout and freshSprout.Parent then consider(freshSprout) end
+    for _, folder in ipairs(sproutFolders) do
+        if folder and folder.Parent then
+            consider(folder)
+            local ok, descendants = pcall(function() return folder:GetDescendants() end)
+            if ok then
+                for _, child in ipairs(descendants) do consider(child) end
+            end
+        end
+    end
+    return best
 end
 
 -- ══════════════════════════════════════════════════════════════════════
@@ -1684,7 +1792,7 @@ function Looter:harvest()
 
     while true do
         if not alive() then return end
-        local sprout = findSprout()
+        local sprout = findLootableSprout()
 
         if sprout then
             if sprout ~= targetSprout then
@@ -1834,8 +1942,8 @@ function Looter:Start()
         end
 
         -- Спруты обрабатываем только если включён сбор ростков.
-        if CONFIG.CHECK_SPROUTS and findSprout() then
-            log("Лутающий", "На текущем сервере есть спрут — лутаю")
+        if CONFIG.CHECK_SPROUTS and findLootableSprout() then
+            log("Лутающий", "На текущем сервере есть подходящий по редкости спрут — лутаю")
             local got = pcall(function() self:harvest() end)
             if not got then log("Лутающий", "Ошибка при лутании") end
         end
@@ -1867,7 +1975,7 @@ function Looter:Start()
 
                 -- Если сбор ростков включён, лутаем спрут на текущем сервере.
                 -- Если выключён, полностью игнорируем спруты и берём только Vicious-задачи.
-                if CONFIG.CHECK_SPROUTS and findSprout() then
+                if CONFIG.CHECK_SPROUTS and findLootableSprout() then
                     local got, hErr = pcall(function() self:harvest() end)
                     if not got then
                         log("Лутающий", "Ошибка лутания: " .. tostring(hErr))
@@ -1894,6 +2002,19 @@ function Looter:Start()
                     s.currentStatus = "Очередь пуста, жду задачу..."
                     task.wait(tonumber(CONFIG.POLL_INTERVAL) or 3)
                     return
+                end
+
+                if not taskData.isVicious and CONFIG.CHECK_SPROUTS then
+                    local queuedRarity = matchWords(tostring(taskData.level or ""))
+                    if not isRarityAtLeast(queuedRarity, CONFIG.MIN_RARITY) then
+                        local reason = "ниже выбранной редкости " .. tostring(CONFIG.MIN_RARITY)
+                        log("Лутающий", "Пропускаю задачу " .. tostring(taskData.jobId) ..
+                            ": rarity=" .. tostring(taskData.level) .. " (" .. reason .. ")")
+                        self:returnTask(taskData, reason)
+                        s.currentStatus = "Задача ниже выбранной редкости — пропускаю"
+                        task.wait(tonumber(CONFIG.POLL_INTERVAL) or 3)
+                        return
+                    end
                 end
 
                 if isFailed(taskData.jobId) then
@@ -2902,7 +3023,79 @@ local fConn  = makeField(pageSettings, "ТАЙМАУТ ПОДКЛЮЧЕНИЯ (�
 local fPlace = makeField(pageSettings, "PLACE ID", CONFIG.PLACE_ID,
     "1537690962", 25)
 
--- Выбор редкости ростков удалён: обработка больше не фильтруется настройкой MIN_RARITY.
+section("МИНИМАЛЬНАЯ РЕДКОСТЬ СПРУТА", 30).Parent = pageSettings
+
+local sproutRarityOrder = { "moon", "basic", "rare", "epic", "legendary", "supreme", "gummy" }
+local sproutRarityLabels = {
+    moon = "Moon", basic = "Common", rare = "Rare", epic = "Epic",
+    legendary = "Legendary", supreme = "Supreme", gummy = "Gummy",
+}
+local sproutRarityColors = {
+    moon = Color3.fromRGB(105, 190, 255),
+    basic = Color3.fromRGB(130, 220, 135),
+    rare = Color3.fromRGB(190, 200, 210),
+    epic = Color3.fromRGB(255, 195, 70),
+    legendary = Color3.fromRGB(75, 220, 205),
+    supreme = Color3.fromRGB(100, 255, 110),
+    gummy = Color3.fromRGB(255, 115, 220),
+}
+if not RARITY_PRIORITY[CONFIG.MIN_RARITY] then CONFIG.MIN_RARITY = "basic" end
+
+local sproutRarityRow = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 70), BackgroundTransparency = 1,
+    LayoutOrder = 31, Parent = pageSettings,
+})
+new("UIGridLayout", {
+    CellSize = UDim2.new(0.25, -5, 0, 30),
+    CellPadding = UDim2.new(0, 6, 0, 6),
+    FillDirectionMaxCells = 4,
+    SortOrder = Enum.SortOrder.LayoutOrder,
+    Parent = sproutRarityRow,
+})
+local sproutRarityButtons = {}
+local function paintSproutRarity()
+    for _, rarityName in ipairs(sproutRarityOrder) do
+        local button = sproutRarityButtons[rarityName]
+        if button then
+            local selected = CONFIG.MIN_RARITY == rarityName
+            button.BackgroundColor3 = selected and C.cardHi or C.field
+            button.TextColor3 = sproutRarityColors[rarityName]
+            local outline = button:FindFirstChildOfClass("UIStroke")
+            if outline then outline.Thickness = selected and 2 or 1 end
+        end
+    end
+end
+
+for index, rarityName in ipairs(sproutRarityOrder) do
+    local button = new("TextButton", {
+        Size = UDim2.new(0.25, -5, 0, 30),
+        BackgroundColor3 = C.field,
+        Text = sproutRarityLabels[rarityName],
+        TextColor3 = sproutRarityColors[rarityName],
+        Font = Enum.Font.GothamBold, TextSize = 10,
+        AutoButtonColor = false, BorderSizePixel = 0,
+        LayoutOrder = index, Parent = sproutRarityRow,
+    })
+    round(button, 8)
+    stroke(button, sproutRarityColors[rarityName], 1)
+    sproutRarityButtons[rarityName] = button
+    button.MouseButton1Click:Connect(function()
+        CONFIG.MIN_RARITY = rarityName
+        paintSproutRarity()
+        saveNow()
+        statusVal.Text = "Минимальная редкость: " .. sproutRarityLabels[rarityName] .. "+"
+        statusVal.TextColor3 = C.accent
+    end)
+end
+paintSproutRarity()
+
+local sproutRarityHelp = new("TextLabel", {
+    Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1,
+    Text = "Лутает выбранную редкость и выше. Неизвестные типы пропускаются, чтобы не перепутать Moon, Rare и Legendary.",
+    TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 10,
+    TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
+    LayoutOrder = 32, Parent = pageSettings,
+})
 
 section("ОПЦИИ", 40).Parent = pageSettings
 
