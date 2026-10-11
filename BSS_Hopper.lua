@@ -1284,13 +1284,24 @@ local function detectRarity(sprout)
         -- Supreme и Common: сначала проверяем цвет + материал + эффект.
         -- Rate не обязателен для Common: в некоторых клиентах ParticleEmitter
         -- может отсутствовать или иметь другое значение.
-        if deg > 62 and deg < 150 then
+        -- Common из подтверждённого дампа почти серо-зелёный:
+        -- RGB примерно (0.706, 0.745, 0.729), Plastic. Поэтому hue/saturation
+        -- может не попасть в зелёный диапазон — проверяем RGB напрямую.
+        local paleGreenPlastic = rootPart.Material == Enum.Material.Plastic
+            and g >= r and g >= b and (g - r) >= 0.015
+            and (g - b) >= 0.005 and val >= 0.55 and val <= 0.90
+
+        if deg > 62 and deg < 150 and sat > 0.15 then
             if sproutHasGlow(sprout) then
                 return "supreme", "signature:supreme-glowing-green"
-            elseif rootPart.Material == Enum.Material.Plastic and sat < 0.55
-                and val >= 0.55 and val <= 0.90 then
+            elseif paleGreenPlastic then
                 return "basic", "signature:common-pale-green-plastic"
             end
+        elseif paleGreenPlastic then
+            if sproutHasGlow(sprout) then
+                return "supreme", "signature:supreme-glowing-pale-green"
+            end
+            return "basic", "signature:common-pale-green-plastic-rgb"
         end
 
         -- Rare: серебристый/серый Glass. Rate у ParticleEmitter может меняться
