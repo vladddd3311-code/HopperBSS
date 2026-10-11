@@ -355,8 +355,8 @@ end
 
 isSprout = function(obj)
     if not obj then return false end
-    local ok, name, parent, isPart, isModel = pcall(function()
-        return obj.Name, obj.Parent, obj:IsA("BasePart"), obj:IsA("Model")
+    local ok, name, parent, isPart, isModel, isFolder = pcall(function()
+        return obj.Name, obj.Parent, obj:IsA("BasePart"), obj:IsA("Model"), obj:IsA("Folder")
     end)
     if not ok or type(name) ~= "string" or not parent then return false end
     local low = string.lower(name)
@@ -364,22 +364,24 @@ isSprout = function(obj)
         return false
     end
 
-    -- MeshPart и другие наследники BasePart имеют ClassName вроде "MeshPart",
-    -- поэтому проверяем IsA("BasePart"), а не точное имя класса.
-    if isPart then
-        local okVisible, visible = pcall(function()
-            return obj.Transparency < 1 and obj.Size.Magnitude > 0.05
-        end)
-        return okVisible and visible
+    -- Не фильтруем по Transparency/Size: Roblox может временно менять их
+    -- при появлении/сборе, из-за чего настоящий Common пропускался.
+    -- Деталь с именем Sprout — кандидат; Model проверяем по имени и наличию частей.
+    if isPart then return true end
+    if isModel then
+        local okParts, descendants = pcall(function() return obj:GetDescendants() end)
+        if not okParts then return true end
+        for _, d in ipairs(descendants) do
+            if d:IsA("BasePart") then return true end
+        end
+        return false
     end
-    if not isModel then return false end
-
-    -- Model считается ростком только если в нём есть видимая физическая деталь.
-    local okParts, descendants = pcall(function() return obj:GetDescendants() end)
-    if not okParts then return false end
-    for _, d in ipairs(descendants) do
-        if d:IsA("BasePart") and d.Transparency < 1 and d.Size.Magnitude > 0.05 then
-            return true
+    -- Folder с именем Sprout тоже может быть контейнером модели в некоторых версиях.
+    if isFolder then
+        local okParts, descendants = pcall(function() return obj:GetDescendants() end)
+        if not okParts then return false end
+        for _, d in ipairs(descendants) do
+            if d:IsA("BasePart") then return true end
         end
     end
     return false
