@@ -1898,6 +1898,50 @@ function Looter:runAtlas()
     end)
 end
 
+-- ── Лутаем Puffshrooms на текущем сервере ──
+-- Atlas собирает найденные грибы; ждём пока исчезнут все подходящие, затем ещё 10 секунд.
+function Looter:harvestPuffshrooms()
+    local targets = findEligiblePuffshrooms()
+    if #targets == 0 then return false end
+
+    local s = self.stats
+    log("Лутающий", "Найдено Puffshrooms для сбора: " .. tostring(#targets) .. "; запускаю Atlas")
+    s.currentStatus = "Puffshrooms найдены — запускаю Atlas"
+    if CONFIG.USE_ATLAS then self:runAtlas() end
+
+    local lastSeen = os.clock()
+    local stableMissing = 0
+    while alive() do
+        local remaining = findEligiblePuffshrooms()
+        if #remaining > 0 then
+            lastSeen = os.clock()
+            stableMissing = 0
+            local labels = {}
+            for _, entry in ipairs(remaining) do
+                table.insert(labels, entry.rarity .. " Lv." .. tostring(entry.level))
+            end
+            s.currentStatus = "Atlas лутает грибы: " .. table.concat(labels, ", ")
+        else
+            stableMissing += 2
+            s.currentStatus = "Грибы исчезли — проверяю ещё (" .. tostring(stableMissing) .. "с)"
+            -- Требуем несколько последовательных проверок, чтобы не реагировать на
+            -- кратковременную репликацию Workspace.
+            if stableMissing >= 6 then break end
+        end
+        task.wait(2)
+    end
+
+    if not alive() then return true end
+    s.currentStatus = "Грибы собраны — жду 10 секунд"
+    log("Лутающий", "Подходящие Puffshrooms исчезли; жду 10 секунд перед сменой сервера")
+    for i = 10, 1, -1 do
+        if not alive() then return true end
+        s.currentStatus = "Грибы собраны — переход через " .. tostring(i) .. "с"
+        task.wait(1)
+    end
+    return true
+end
+
 -- ── Лутаем спрут на текущем сервере, никуда не переходим ──
 -- Правило: уйти можно ТОЛЬКО когда спрут сломан И прошло BROKEN_WAIT.
 function Looter:harvest()
@@ -2067,6 +2111,12 @@ function Looter:Start()
             end
         end
 
+        -- Puffshrooms: лутаем все подходящие грибы на сервере до исчезновения.
+        if CONFIG.CHECK_PUFFSHROOMS and #findEligiblePuffshrooms() > 0 then
+            local okPuff, errPuff = pcall(function() self:harvestPuffshrooms() end)
+            if not okPuff then log("Лутающий", "Ошибка сбора Puffshrooms: " .. tostring(errPuff)) end
+        end
+
         -- Спруты обрабатываем только если включён сбор ростков.
         if CONFIG.CHECK_SPROUTS and findLootableSprout() then
             log("Лутающий", "На текущем сервере есть подходящий по редкости спрут — лутаю")
@@ -2097,6 +2147,16 @@ function Looter:Start()
                         log("Лутающий", "Vicious исчез; возвращаюсь к поиску задач")
                         return
                     end
+                end
+
+                -- Если на текущем сервере есть Puffshrooms, сначала собираем их.
+                if CONFIG.CHECK_PUFFSHROOMS and #findEligiblePuffshrooms() > 0 then
+                    local gotPuff, puffErr = pcall(function() self:harvestPuffshrooms() end)
+                    if not gotPuff then
+                        log("Лутающий", "Ошибка сбора Puffshrooms: " .. tostring(puffErr))
+                        task.wait(3)
+                    end
+                    return
                 end
 
                 -- Если сбор ростков включён, лутаем спрут на текущем сервере.
