@@ -1261,18 +1261,24 @@ local function detectRarity(sprout)
     local own = matchWords(ownName)
     if own then return own, "own-name" end
 
-    -- 2) Текстовые метки: требуем явное название типа спрута.
-    local okFind, billboard = pcall(function()
-        return sprout:FindFirstChildWhichIsA("BillboardGui", true)
-    end)
-    if okFind and billboard then
-        for _, d in ipairs(billboard:GetDescendants()) do
-            if (d:IsA("TextLabel") or d:IsA("TextButton")) and d.Text then
-                local txt = string.lower(tostring(d.Text))
-                -- Не считаем одиночные декоративные слова/проценты маркером редкости.
-                if string.find(txt, "sprout", 1, true) then
-                    local found = matchWords(txt)
-                    if found then return found, "billboard-explicit" end
+    -- 2) Ищем метки во ВСЕХ вложенных GUI, не только в первом BillboardGui.
+    -- В некоторых версиях BSS название редкости и слово Sprout находятся
+    -- в разных TextLabel либо в SurfaceGui.
+    local okGui, guiDescendants = pcall(function() return sprout:GetDescendants() end)
+    if okGui then
+        for _, d in ipairs(guiDescendants) do
+            if d:IsA("TextLabel") or d:IsA("TextButton") then
+                local txt = string.lower(tostring(d.Text or ""))
+                local found = matchWords(txt)
+                if found and (string.find(txt, "sprout", 1, true)
+                    or string.find(txt, "legendary", 1, true)
+                    or string.find(txt, "common", 1, true)
+                    or string.find(txt, "rare", 1, true)
+                    or string.find(txt, "epic", 1, true)
+                    or string.find(txt, "supreme", 1, true)
+                    or string.find(txt, "gummy", 1, true)
+                    or string.find(txt, "moon", 1, true)) then
+                    return found, "gui-explicit"
                 end
             end
         end
@@ -1319,10 +1325,12 @@ local function detectRarity(sprout)
         if part.Material == Enum.Material.Neon and deg >= 195 and deg <= 220 then
             hasMoonLegendaryCandidate = true
         end
-        if part.Material == Enum.Material.Neon and deg >= 195 and deg <= 220 and rate then
+        if part.Material == Enum.Material.Neon and deg >= 190 and deg <= 230 and rate then
             if rate <= 20 then
                 return "moon", "signature:moon-neon-low-sparkles"
-            elseif rate >= 100 then
+            elseif rate >= 80 then
+                -- Подтверждённый Legendary образец: голубой Neon + Sparkles Rate 150.
+                -- Порог немного снижен, чтобы пережить различия между клиентами.
                 return "legendary", "signature:legendary-neon-high-sparkles"
             end
         end
