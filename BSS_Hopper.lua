@@ -355,8 +355,8 @@ end
 
 isSprout = function(obj)
     if not obj then return false end
-    local ok, name, className, parent = pcall(function()
-        return obj.Name, obj.ClassName, obj.Parent
+    local ok, name, parent, isPart, isModel = pcall(function()
+        return obj.Name, obj.Parent, obj:IsA("BasePart"), obj:IsA("Model")
     end)
     if not ok or type(name) ~= "string" or not parent then return false end
     local low = string.lower(name)
@@ -364,18 +364,22 @@ isSprout = function(obj)
         return false
     end
 
-    -- Не считать папки/контейнеры с названием Sprout настоящим ростком.
-    -- Кандидат должен быть физическим объектом или Model с деталями.
-    if className == "BasePart" then return true end
-    if className ~= "Model" then return false end
+    -- MeshPart и другие наследники BasePart имеют ClassName вроде "MeshPart",
+    -- поэтому проверяем IsA("BasePart"), а не точное имя класса.
+    if isPart then
+        local okVisible, visible = pcall(function()
+            return obj.Transparency < 1 and obj.Size.Magnitude > 0.05
+        end)
+        return okVisible and visible
+    end
+    if not isModel then return false end
+
+    -- Model считается ростком только если в нём есть видимая физическая деталь.
     local okParts, descendants = pcall(function() return obj:GetDescendants() end)
     if not okParts then return false end
     for _, d in ipairs(descendants) do
-        if d:IsA("BasePart") then
-            -- Отбрасываем оставшиеся пустые/невидимые объекты после сбора.
-            if d.Transparency < 1 and d.Size.Magnitude > 0.05 then
-                return true
-            end
+        if d:IsA("BasePart") and d.Transparency < 1 and d.Size.Magnitude > 0.05 then
+            return true
         end
     end
     return false
