@@ -360,9 +360,9 @@ isSprout = function(obj)
     end)
     if not ok or type(name) ~= "string" or not parent then return false end
     local low = string.lower(name)
-    if low ~= "sprout" and not string.find(low, "sprout", 1, true) then
-        return false
-    end
+    -- Не принимаем имена вроде "SproutParticle", "SproutTimer" и прочие
+    -- эффекты/остатки: кандидат должен называться ровно Sprout.
+    if low ~= "sprout" then return false end
 
     -- Не фильтруем по Transparency/Size: Roblox может временно менять их
     -- при появлении/сборе, из-за чего настоящий Common пропускался.
@@ -390,13 +390,13 @@ end
 -- Флаг freshSprout объявлен выше, чтобы callbacks захватывали именно local-переменную.
 
 local function watchFolders()
+    -- Только контейнеры, предназначенные для объектов ростков.
+    -- Не сканируем общие Particles/Fields/Workspace: там есть эффекты и
+    -- декоративные объекты с похожими именами, вызывающие ложные находки.
     local paths = {
         "Particles.Folder2",
-        "Particles",
-        "Sprouts",
-        "Happenings",
         "Happenings.Sprouts",
-        "Fields",
+        "Sprouts",
     }
     for _, p in ipairs(paths) do addFolder(p) end
 
@@ -450,17 +450,8 @@ local function findSprout()
         if isSprout(folder) then return folder end
     end
 
-    -- Резервный полный поиск по Workspace: в разных версиях BSS
-    -- росток может оказаться в другой папке, не только Particles.Folder2.
-    local okWorkspace, all = pcall(function() return Workspace:GetDescendants() end)
-    if okWorkspace then
-        for _, child in ipairs(all) do
-            if isSprout(child) then
-                log("Спрут", "Найден полным поиском Workspace: " .. tostring(child:GetFullName()))
-                return child
-            end
-        end
-    end
+    -- Никакого полного поиска по Workspace: он давал ложные срабатывания
+    -- на эффекты/остатки. Ищем только внутри известных контейнеров выше.
     return nil
 end
 
