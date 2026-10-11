@@ -659,6 +659,8 @@ local function findPuffshrooms()
     return results
 end
 
+local puffScanLogAt = 0
+
 local function findEligiblePuffshrooms()
     local results = {}
     local minimumRarity = PUFF_RARITY_PRIORITY[CONFIG.PUFF_MIN_RARITY] or 1
@@ -670,6 +672,35 @@ local function findEligiblePuffshrooms()
         end
     end
     return results
+end
+
+-- Единая точка поиска для режима Searcher; Looter получает полный список.
+local function findPuffshroom()
+    local ok, entries = pcall(findEligiblePuffshrooms)
+    if not ok then
+        log("Puffshroom", "Ошибка сканирования объектов: " .. tostring(entries))
+        return nil
+    end
+    if #entries > 0 then
+        local entry = entries[1]
+        return entry.root, entry.rarity, entry.level
+    end
+    -- Не спамим лог: диагностика не чаще одного раза в 15 секунд.
+    if os.clock() - puffScanLogAt >= 15 then
+        puffScanLogAt = os.clock()
+        local scanOk, descendants = pcall(function() return Workspace:GetDescendants() end)
+        if scanOk then
+            local named = 0
+            for _, obj in ipairs(descendants) do
+                if isPuffshroomRoot(obj) then named += 1 end
+            end
+            if named > 0 then
+                log("Puffshroom", "Кандидатов: " .. tostring(named) ..
+                    ", но не удалось прочитать редкость/уровень (нужен уровень 1–30)")
+            end
+        end
+    end
+    return nil
 end
 
 -- ══════════════════════════════════════════════════════════════════════
@@ -2593,9 +2624,9 @@ trace("ScreenGui создан")
 -- ══════════════════════════════════════════════════════════════════════
 --  ОКНО
 -- ══════════════════════════════════════════════════════════════════════
-local WIN_W, WIN_H = 960, 500
-local HEADER_H = 66
-local SIDEBAR_W = 180
+local WIN_W, WIN_H = 820, 460
+local HEADER_H = 58
+local SIDEBAR_W = 154
 
 local win = new("Frame", {
     Name = "Win",
@@ -2819,18 +2850,17 @@ local function makeTab(icon, label, key, locked)
     return b
 end
 
-makeTab("⌂", "Main", "main")
+makeTab("⌂", "Главная", "main")
 makeTab("🌱", "Спруты", "sprouts")
 makeTab("⚙", "Настройки", "settings")
 
--- Дополнительные вкладки; Vicious Bee остаётся отдельным рабочим разделом
-for i = 1, 5 do
+-- Показываем только готовые разделы, без пустых вкладок-заглушек.
+for i = 1, 2 do
     local key = "soon" .. i
-    local icon, label = "🔒", "Скоро"
-    local locked = true
+    local icon, label, locked
     if i == 1 then
         icon, label, locked = "🐝", "Vicious Bee", false
-    elseif i == 2 then
+    else
         icon, label, locked = "🍄", "Puffshrooms", false
     end
 
@@ -3285,8 +3315,8 @@ end
 paintSproutRarity()
 
 local sproutRarityHelp = new("TextLabel", {
-    Size = UDim2.new(1, 0, 0, 36), BackgroundTransparency = 1,
-    Text = "Порядок: Common → Moon → Rare → Gummy → Epic → Legendary. Неизвестные ростки пропускаются.",
+    Size = UDim2.new(1, 0, 0, 20), BackgroundTransparency = 1,
+    Text = "Минимальная редкость",
     TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 10,
     TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
     LayoutOrder = 32, Parent = pageSettings,
@@ -3429,8 +3459,8 @@ for i = 1, 5 do
         -- ── Рабочий раздел: Puffshrooms ──
         section("ПОИСК PUFFSHROOMS", 1).Parent = p
         local puffInfo = new("TextLabel", {
-            Size = UDim2.new(1, 0, 0, 68), BackgroundColor3 = C.card,
-            Text = "🍄 Автопоиск Puffshroom. В Discord отправляются Common, Rare, Epic, Legendary и Mythic; в уведомлении указан уровень гриба.",
+            Size = UDim2.new(1, 0, 0, 34), BackgroundColor3 = C.card,
+            Text = "🍄 Поиск и уведомления о грибах",
             TextColor3 = C.dim, Font = Enum.Font.Gotham, TextSize = 11,
             TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left,
             TextYAlignment = Enum.TextYAlignment.Center,
@@ -3642,11 +3672,11 @@ new("UIListLayout", {
     Parent = PAGE_MAIN,
 })
 
--- Переносим блоки раздела «Спруты» на отдельную страницу
+-- Блоки поиска должны находиться именно во вкладке «Спруты».
 for _, obj in ipairs({
     secModes, modeRow, secStatus, statusBox, secLast, lastBox,
 }) do
-    if obj then obj.Parent = PAGE_HOME end
+    if obj then obj.Parent = PAGE_MAIN end
 end
 -- Порядок на Main: целевые переключатели, режимы, статус, последняя задача.
 secModes.LayoutOrder = 10
