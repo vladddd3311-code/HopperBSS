@@ -1636,8 +1636,11 @@ function Searcher:report(jobId, rarity, fieldName)
         searcherTag = CONFIG.SELF_TAG,
     })
 
+    -- При нескольких хопперах API может ответить с задержкой.
+    -- Даём репорту больше попыток и увеличиваем паузу, прежде чем объявлять сбой.
     local lastError = "неизвестная ошибка"
-    for attempt = 1, 3 do
+    local maxAttempts = math.max(5, tonumber(CONFIG.MAX_ATTEMPTS) or 3)
+    for attempt = 1, maxAttempts do
         local ok, resp = pcall(function()
             local responseBody = postJson("/report", body)
             return responseBody
@@ -1645,14 +1648,17 @@ function Searcher:report(jobId, rarity, fieldName)
         if ok and not responseRejected(resp) then
             self.stats.reportsSent += 1
             self.stats.lastSprout = { fieldName = "отправлено" }
-            log("Ищущий", "API принял репорт о ростке: " .. tostring(resp))
+            log("Ищущий", "API принял репорт о ростке (попытка " .. tostring(attempt) .. "): " .. tostring(resp))
             return true
         end
-        lastError = ok and tostring(resp) or tostring(resp)
-        log("Ищущий", "Ошибка отправки репорта, попытка " .. tostring(attempt) .. "/3: " .. lastError)
-        if attempt < 3 then task.wait(attempt * 1.5) end
+        lastError = tostring(resp)
+        log("Ищущий", "Ошибка отправки репорта, попытка " .. tostring(attempt) .. "/" .. tostring(maxAttempts) .. ": " .. lastError)
+        if attempt < maxAttempts then
+            -- 1.5, 3, 4.5, 6 секунды; ограничиваем паузу, чтобы не зависать надолго.
+            task.wait(math.min(attempt * 1.5, 6))
+        end
     end
-    log("Ищущий", "ОШИБКА: API не подтвердил репорт о ростке: " .. tostring(lastError))
+    log("Ищущий", "ОШИБКА: API не подтвердил репорт о ростке после " .. tostring(maxAttempts) .. " попыток: " .. tostring(lastError))
     return false
 end
 
