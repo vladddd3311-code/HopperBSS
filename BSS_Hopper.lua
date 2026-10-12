@@ -1485,13 +1485,14 @@ local function detectRarity(sprout)
             return "gummy", "signature:gummy-magenta-glass"
         end
 
-        -- Epic: подтверждённый образец пользователя RGB (169, 157, 175), Glass.
-        -- Размер не используется, так как росток может уменьшаться.
+        -- Epic: золотистый Glass. Не привязываемся к одному RGB,
+        -- поскольку оттенок может немного меняться из-за освещения/клиента.
+        -- Проверяем каждую деталь модели; редкость подтверждается материалом,
+        -- золотым Hue и достаточной насыщенностью.
         if part.Material == Enum.Material.Glass
-            and math.abs(r - (169 / 255)) <= 0.025
-            and math.abs(g - (157 / 255)) <= 0.025
-            and math.abs(b - (175 / 255)) <= 0.025 then
-            return "epic", "signature:epic-confirmed-rgb-glass"
+            and deg >= 28 and deg <= 62
+            and sat > 0.40 and val >= 0.25 then
+            return "epic", "signature:epic-gold-glass"
         end
 
         -- Rare: серебристо-серый Glass из подтверждённого образца.
