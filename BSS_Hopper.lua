@@ -105,7 +105,7 @@ local CONFIG = {
     MIN_RARITY   = "basic",   -- лутающий берёт только не ниже этого
     PLACE_ID     = 1537690962,
 
-    HOP_DELAY      = 1.5,
+    HOP_DELAY      = 3, -- минимум 3 секунды поиска перед следующим сервером
     POLL_INTERVAL  = 3,
     BROKEN_WAIT    = 20,
     INITIAL_CHECK  = 1,
@@ -1924,7 +1924,8 @@ function Searcher:Start()
                 hopRandom()
             end
 
-            task.wait(tonumber(CONFIG.HOP_DELAY) or 1.5)
+            -- Ищущий и соло не перезаходят раньше чем через 3 секунды поиска.
+            task.wait(math.max(3, tonumber(CONFIG.HOP_DELAY) or 3))
         end
     end)
 end
