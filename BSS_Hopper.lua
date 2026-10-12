@@ -1618,12 +1618,29 @@ local function postJson(path, body)
 end
 
 local function responseRejected(resp)
-    local lower = string.lower(tostring(resp or ""))
-    return string.find(lower, '"error"', 1, true) ~= nil
+    local raw = tostring(resp or "")
+    -- Сначала разбираем JSON: не считаем успешный ответ ошибкой только
+    -- из-за слова "error" в другом поле ответа.
+    local decoded
+    local okDecode, value = pcall(function()
+        return HttpService:JSONDecode(raw)
+    end)
+    if okDecode and type(value) == "table" then
+        decoded = value
+        if decoded.status == "ok" or decoded.ok == true or decoded.success == true then
+            return false
+        end
+        if decoded.status == "error" or decoded.ok == false or decoded.success == false then
+            return true
+        end
+    end
+    local lower = string.lower(raw)
+    return string.find(lower, "unauthorized", 1, true) ~= nil
+        or string.find(lower, "invalid api key", 1, true) ~= nil
+        or string.find(lower, "internal server error", 1, true) ~= nil
+        or string.find(lower, '"status":"error"', 1, true) ~= nil
         or string.find(lower, '"success":false', 1, true) ~= nil
         or string.find(lower, '"ok":false', 1, true) ~= nil
-        or string.find(lower, "unauthorized", 1, true) ~= nil
-        or string.find(lower, "invalid api key", 1, true) ~= nil
 end
 
 function Searcher:report(jobId, rarity, fieldName)
